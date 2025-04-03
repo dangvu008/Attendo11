@@ -26,14 +26,18 @@ export default function HomeScreen({ navigation }) {
   }, [])
 
   // Format current time as HH:MM
-  const formattedTime = currentTime.toLocaleTimeString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
+  const formattedTime = currentTime
+    ? currentTime.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
+    : "--:--"
 
   // Format current date
-  const formattedDate = `${getDayName(currentTime.getDay(), t)}, ${currentTime.getDate()}/${currentTime.getMonth() + 1}`
+  const formattedDate = currentTime
+    ? `${getDayName(currentTime.getDay(), t)}, ${currentTime.getDate()}/${currentTime.getMonth() + 1}`
+    : ""
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? "#121212" : "#f5f5f5" }]}>
@@ -54,7 +58,8 @@ export default function HomeScreen({ navigation }) {
               <Text style={[styles.shiftName, { color: darkMode ? "#fff" : "#000" }]}>{currentShift.name}</Text>
             </View>
             <Text style={[styles.shiftTime, { color: darkMode ? "#bbb" : "#555" }]}>
-              {formatTime(currentShift.startTime)} → {formatTime(currentShift.endTime)}
+              {currentShift.startTime ? formatTime(currentShift.startTime) : "--:--"} →{" "}
+              {currentShift.endTime ? formatTime(currentShift.endTime) : "--:--"}
             </Text>
           </View>
         )}

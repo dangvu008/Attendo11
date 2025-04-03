@@ -1,9 +1,21 @@
 // Format time as HH:MM
 export const formatTime = (date) => {
+  // Check if date is undefined or null
+  if (!date) {
+    return "--:--" // Return a default value for undefined/null dates
+  }
+
+  // If date is already a string, return it as is
   if (typeof date === "string") {
     return date
   }
 
+  // Make sure date is a valid Date object
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    return "--:--" // Return default for invalid Date objects
+  }
+
+  // Now safely call toLocaleTimeString on a valid Date object
   return date.toLocaleTimeString("vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
