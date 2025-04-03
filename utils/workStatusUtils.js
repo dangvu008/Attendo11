@@ -6,7 +6,18 @@ import {
   safeGetItem,
   safeSetItem,
   STORAGE_KEYS,
+  getShiftConfig,
 } from "./database";
+
+import {
+  isNightShift,
+  createShiftTimestamps,
+  adjustCheckTimes,
+  calculateTimeDeviations,
+  calculateAdjustedWorkHours,
+  generateStatusRemarks,
+  calculateWorkTimeStatus,
+} from "./timeRules";
 
 // Mã trạng thái làm việc
 export const WORK_STATUS = {
@@ -36,6 +47,7 @@ export const STATUS_ICONS = {
 const TIME_THRESHOLDS = {
   LATE_THRESHOLD: 5, // Số phút cho phép đi muộn
   EARLY_THRESHOLD: 5, // Số phút cho phép về sớm
+  OVERTIME_THRESHOLD: 30, // Số phút tối thiểu để tính tăng ca
 };
 
 // Calculate work status based on attendance logs
@@ -53,6 +65,9 @@ export const calculateWorkStatus = async (date) => {
         remarks: "Không có ca làm việc được áp dụng",
       };
     }
+
+    // Lấy cấu hình ca làm việc
+    const shiftConfig = await getShiftConfig();
 
     // Get attendance logs for the date
     const logs = await getAttendanceLogs(date);
@@ -153,112 +168,129 @@ export const calculateWorkStatus = async (date) => {
       };
     }
 
-    // Parse shift times
-    const [startHours, startMinutes] = activeShift.startTime
-      .split(":")
-      .map(Number);
-    const [officeEndHours, officeEndMinutes] = activeShift.officeEndTime
-      .split(":")
-      .map(Number);
-
-    // Create Date objects for shift times
-    const shiftStartTime = new Date(date);
-    shiftStartTime.setHours(startHours, startMinutes, 0, 0);
-
-    const shiftEndTime = new Date(date);
-    shiftEndTime.setHours(officeEndHours, officeEndMinutes, 0, 0);
-
-    // Calculate standard work time (in hours)
-    const standardWorkTime = (shiftEndTime - shiftStartTime) / (1000 * 60 * 60);
-
     // Nếu có check-in và check-out logs, tính toán thời gian làm việc thực tế
     if (checkInLog && checkOutLog) {
       const checkInTime = new Date(checkInLog.timestamp);
       const checkOutTime = new Date(checkOutLog.timestamp);
 
-      // Tính thời gian làm việc thực tế (theo giờ)
-      const actualWorkTime = (checkOutTime - checkInTime) / (1000 * 60 * 60);
+      // Xác định xem có phải ca đêm hay không
+      let isNightShiftType = false;
 
-      // Kiểm tra đi muộn
-      const lateMinutes = (checkInTime - shiftStartTime) / (1000 * 60);
-      const isLate = lateMinutes > TIME_THRESHOLDS.LATE_THRESHOLD;
-
-      // Kiểm tra về sớm
-      const earlyMinutes = (shiftEndTime - checkOutTime) / (1000 * 60);
-      const isEarly = earlyMinutes > TIME_THRESHOLDS.EARLY_THRESHOLD;
-
-      // Tính tăng ca
-      let overtime = 0;
-      if (checkOutTime > shiftEndTime) {
-        overtime = (checkOutTime - shiftEndTime) / (1000 * 60 * 60);
+      if (
+        activeShift.isNightShift === true ||
+        (shiftConfig.nightShiftDetection === "auto" &&
+          isNightShift(activeShift.startTime, activeShift.officeEndTime))
+      ) {
+        isNightShiftType = true;
       }
 
-      // Làm tròn giá trị
-      const roundedActualWorkTime = Math.round(actualWorkTime * 10) / 10;
-      const roundedOvertime = Math.round(overtime * 10) / 10;
+      // Cấu hình ngưỡng thời gian
+      const thresholds = {
+        late:
+          shiftConfig.timeThresholds?.lateThreshold ||
+          TIME_THRESHOLDS.LATE_THRESHOLD,
+        early:
+          shiftConfig.timeThresholds?.earlyThreshold ||
+          TIME_THRESHOLDS.EARLY_THRESHOLD,
+        overtime:
+          shiftConfig.timeThresholds?.overtimeThreshold ||
+          TIME_THRESHOLDS.OVERTIME_THRESHOLD,
+      };
+
+      // Tạo đối tượng ca làm việc
+      const shiftTimes = createShiftTimestamps(
+        date,
+        activeShift.startTime,
+        activeShift.officeEndTime,
+        isNightShiftType
+      );
+
+      // Điều chỉnh thời gian check-in và check-out
+      const adjustedTimes = adjustCheckTimes(checkInTime, checkOutTime);
+
+      // Tính toán thời gian đi muộn, về sớm và tăng ca
+      const timeDeviations = calculateTimeDeviations(
+        adjustedTimes.checkIn,
+        adjustedTimes.checkOut,
+        shiftTimes.start,
+        shiftTimes.end
+      );
+
+      // Xác định có đi muộn hay về sớm không
+      const isLate = timeDeviations.lateMinutes > thresholds.late;
+      const isEarly = timeDeviations.earlyMinutes > thresholds.early;
+
+      // Tính tổng thời gian làm việc chuẩn sau khi trừ thời gian đi muộn/về sớm
+      const totalWorkHours = calculateAdjustedWorkHours(
+        shiftTimes.duration,
+        isLate ? timeDeviations.lateMinutes : 0,
+        isEarly ? timeDeviations.earlyMinutes : 0
+      );
+
+      // Tính tăng ca, chỉ khi vượt qua ngưỡng
+      const overtimeHours =
+        timeDeviations.overtimeMinutes >= thresholds.overtime
+          ? timeDeviations.overtimeHours
+          : 0;
+
+      // Tạo ghi chú
+      const remarks = generateStatusRemarks(
+        isLate,
+        isEarly,
+        timeDeviations.lateMinutes,
+        timeDeviations.earlyMinutes,
+        timeDeviations.overtimeMinutes
+      );
 
       // Xác định trạng thái
       let status = WORK_STATUS.FULL_WORK;
       let statusDisplay = STATUS_ICONS[WORK_STATUS.FULL_WORK];
-      let remarks = "Chấm công đầy đủ và đúng giờ";
 
-      // Nếu đi muộn hoặc về sớm
       if (isLate || isEarly) {
         status = WORK_STATUS.LATE_EARLY;
         statusDisplay = STATUS_ICONS[WORK_STATUS.LATE_EARLY];
-
-        if (isLate && isEarly) {
-          remarks = `Vào muộn ${Math.round(
-            lateMinutes
-          )} phút & Ra sớm ${Math.round(earlyMinutes)} phút`;
-        } else if (isLate) {
-          remarks = `Vào muộn ${Math.round(lateMinutes)} phút`;
-        } else {
-          remarks = `Ra sớm ${Math.round(earlyMinutes)} phút`;
-        }
       }
 
-      // Tính tổng giờ công theo chuẩn mới
-      let totalStandardHours = 0;
+      // Làm tròn số
+      const roundedOvertimeHours = Math.round(overtimeHours * 10) / 10;
+      const roundedActualWorkHours =
+        Math.round(timeDeviations.actualWorkHours * 10) / 10;
 
-      // Nếu không trễ hoặc sớm (đủ công)
-      if (!isLate && !isEarly) {
-        totalStandardHours = standardWorkTime;
-      } else {
-        // Nếu là RV, tính toán giờ công thực tế (trừ đi thời gian đi muộn/về sớm)
-        totalStandardHours = standardWorkTime;
-
-        if (isLate) {
-          totalStandardHours -= lateMinutes / 60; // Trừ số phút đi muộn (quy đổi ra giờ)
-        }
-
-        if (isEarly) {
-          totalStandardHours -= earlyMinutes / 60; // Trừ số phút về sớm (quy đổi ra giờ)
-        }
-
-        // Làm tròn giá trị
-        totalStandardHours = Math.round(totalStandardHours * 10) / 10;
-      }
-
-      // Nếu có tăng ca đáng kể (hơn 30 phút)
-      if (overtime >= 0.5) {
-        remarks +=
-          overtime >= 0.5 ? ` Tăng ca ${Math.round(overtime * 60)} phút` : "";
-      }
+      // Log thông tin để debug
+      console.log("DEBUG - Tính công mới:", {
+        date,
+        isNightShift: isNightShiftType,
+        checkInTime: checkInTime.toISOString(),
+        checkOutTime: checkOutTime.toISOString(),
+        shiftStartTime: shiftTimes.start.toISOString(),
+        shiftEndTime: shiftTimes.end.toISOString(),
+        adjustedCheckInTime: adjustedTimes.checkIn.toISOString(),
+        adjustedCheckOutTime: adjustedTimes.checkOut.toISOString(),
+        lateMinutes: timeDeviations.lateMinutes,
+        earlyMinutes: timeDeviations.earlyMinutes,
+        overtimeMinutes: timeDeviations.overtimeMinutes,
+        isLate,
+        isEarly,
+        totalWorkHours,
+        roundedActualWorkHours,
+        roundedOvertimeHours,
+        thresholds,
+      });
 
       return {
         status,
         statusDisplay,
-        totalWorkTime: totalStandardHours, // Giờ công tính theo chuẩn mới
-        actualWorkTime: roundedActualWorkTime, // Thời gian làm việc thực tế
-        overtime: roundedOvertime,
+        totalWorkTime: totalWorkHours,
+        actualWorkTime: roundedActualWorkHours,
+        overtime: roundedOvertimeHours,
         remarks,
         checkInTime: checkInTime.toLocaleTimeString(),
         checkOutTime: checkOutTime.toLocaleTimeString(),
         isLate,
         isEarly,
-        lateMinutes: isLate ? Math.round(lateMinutes) : 0,
-        earlyMinutes: isEarly ? Math.round(earlyMinutes) : 0,
+        lateMinutes: isLate ? Math.round(timeDeviations.lateMinutes) : 0,
+        earlyMinutes: isEarly ? Math.round(timeDeviations.earlyMinutes) : 0,
+        isNightShift: isNightShiftType,
       };
     } else if (checkInLog && !checkOutLog) {
       // Chỉ chấm công vào, chưa chấm công ra

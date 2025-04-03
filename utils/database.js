@@ -29,6 +29,7 @@ export const STORAGE_KEYS = {
   LAST_BACKUP_TIME: "lastBackupTime", // Timestamp of last backup
   HOLIDAYS: "holidays", // Ngày nghỉ lễ
   LEAVES: "leaves", // Ngày nghỉ phép/bệnh
+  SHIFT_CONFIG: "shiftConfig", // Cấu hình cho ca làm việc
 };
 
 /**
@@ -912,6 +913,96 @@ export const removeLeave = async (date) => {
     return true;
   } catch (error) {
     console.error("Error removing leave:", error);
+    return false;
+  }
+};
+
+/**
+ * Get shift configuration
+ *
+ * @returns {Promise<object>} - Shift configuration
+ */
+export const getShiftConfig = async () => {
+  try {
+    const defaultConfig = {
+      nightShiftEnabled: true, // Bật xử lý ca đêm
+      nightShiftDetection: "auto", // auto: Tự động, manual: Thủ công
+      timeThresholds: {
+        lateThreshold: 5, // Số phút tối đa cho phép đi muộn
+        earlyThreshold: 5, // Số phút tối đa cho phép về sớm
+        overtimeThreshold: 30, // Số phút tối thiểu để được tính là tăng ca
+      },
+    };
+
+    return await safeGetItem(STORAGE_KEYS.SHIFT_CONFIG, defaultConfig);
+  } catch (error) {
+    console.error("Error getting shift configuration:", error);
+    return {
+      nightShiftEnabled: true,
+      nightShiftDetection: "auto",
+      timeThresholds: {
+        lateThreshold: 5,
+        earlyThreshold: 5,
+        overtimeThreshold: 30,
+      },
+    };
+  }
+};
+
+/**
+ * Update shift configuration
+ *
+ * @param {object} newConfig - New configuration
+ * @returns {Promise<boolean>} - True if successful, false otherwise
+ */
+export const updateShiftConfig = async (newConfig) => {
+  try {
+    const currentConfig = await getShiftConfig();
+    const updatedConfig = { ...currentConfig, ...newConfig };
+
+    // Đảm bảo các giá trị số không âm và hợp lệ
+    if (updatedConfig.timeThresholds) {
+      updatedConfig.timeThresholds.lateThreshold = Math.max(
+        0,
+        updatedConfig.timeThresholds.lateThreshold || 0
+      );
+      updatedConfig.timeThresholds.earlyThreshold = Math.max(
+        0,
+        updatedConfig.timeThresholds.earlyThreshold || 0
+      );
+      updatedConfig.timeThresholds.overtimeThreshold = Math.max(
+        0,
+        updatedConfig.timeThresholds.overtimeThreshold || 0
+      );
+    }
+
+    return await safeSetItem(STORAGE_KEYS.SHIFT_CONFIG, updatedConfig);
+  } catch (error) {
+    console.error("Error updating shift configuration:", error);
+    return false;
+  }
+};
+
+/**
+ * Set a shift as night shift
+ *
+ * @param {string} shiftId - ID of the shift
+ * @param {boolean} isNightShift - Whether this is a night shift
+ * @returns {Promise<boolean>} - True if successful, false otherwise
+ */
+export const setShiftAsNightShift = async (shiftId, isNightShift) => {
+  try {
+    const shiftList = await getShiftList();
+    const updatedList = shiftList.map((shift) => {
+      if (shift.id === shiftId) {
+        return { ...shift, isNightShift };
+      }
+      return shift;
+    });
+
+    return await safeSetItem(STORAGE_KEYS.SHIFT_LIST, updatedList);
+  } catch (error) {
+    console.error("Error setting shift as night shift:", error);
     return false;
   }
 };
