@@ -1,7 +1,7 @@
 "use client"
 
 import { useContext } from "react"
-import { View, Text, Switch, ScrollView, TouchableOpacity } from "react-native"
+import { View, Text, Switch, ScrollView, TouchableOpacity, StyleSheet } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { AppContext } from "../context/AppContext"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useContext, useState, useEffect } from "react"
+import { useContext, useState, useEffect, useCallback } from "react"
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { AppContext } from "../context/AppContext"
@@ -16,6 +16,12 @@ export default function WeeklyStatusGrid({ darkMode }) {
   const [statusModalVisible, setStatusModalVisible] = useState(false)
   const [detailsModalVisible, setDetailsModalVisible] = useState(false)
 
+  // Load weekly status data
+  const loadWeeklyStatus = useCallback(async () => {
+    const status = await getWeeklyStatus(weekDays)
+    setWeeklyStatus(status)
+  }, [weekDays])
+
   // Load weekly status
   useEffect(() => {
     loadWeeklyStatus()
@@ -26,13 +32,7 @@ export default function WeeklyStatusGrid({ darkMode }) {
     }, 60000)
 
     return () => clearInterval(intervalId)
-  }, [weekDays])
-
-  // Load weekly status data
-  const loadWeeklyStatus = async () => {
-    const status = await getWeeklyStatus(weekDays)
-    setWeeklyStatus(status)
-  }
+  }, [weekDays, loadWeeklyStatus])
 
   // Get day name
   const getDayName = (date) => {

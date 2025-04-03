@@ -59,7 +59,16 @@ export default function AddNoteScreen({ navigation, route }) {
     ) {
       setHasUnsavedChanges(true)
     }
-  }, [title, content, reminderTime, selectedDays])
+  }, [
+    title,
+    content,
+    reminderTime,
+    selectedDays,
+    editingNote?.title,
+    editingNote?.content,
+    editingNote?.reminderTime,
+    editingNote?.days,
+  ])
 
   // Handle time change
   const onTimeChange = (event, selectedTime) => {

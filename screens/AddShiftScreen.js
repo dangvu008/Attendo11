@@ -103,6 +103,15 @@ export default function AddShiftScreen({ navigation, route }) {
     remindAfterEnd,
     showSignButton,
     daysApplied,
+    editingShift?.name,
+    editingShift?.departureTime,
+    editingShift?.startTime,
+    editingShift?.officeEndTime,
+    editingShift?.endTime,
+    editingShift?.remindBeforeStart,
+    editingShift?.remindAfterEnd,
+    editingShift?.showSignButton,
+    editingShift?.daysApplied,
   ])
 
   // Handle time change
