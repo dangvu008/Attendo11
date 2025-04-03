@@ -241,9 +241,25 @@ export default function WeeklyStatusGrid({ darkMode }) {
     if (!currentShift) return null
 
     const dayOfWeek = date.getDay() // 0 = Sunday, 1 = Monday, ...
+
+    // Check if daysApplied exists and is an array
+    if (!currentShift.daysApplied || !Array.isArray(currentShift.daysApplied)) {
+      return null
+    }
+
+    // Check if the day is within the array bounds
+    if (dayOfWeek < 0 || dayOfWeek >= currentShift.daysApplied.length) {
+      return null
+    }
+
     const isApplied = currentShift.daysApplied[dayOfWeek]
 
     if (!isApplied) return null
+
+    // Make sure startTime and endTime exist
+    if (!currentShift.startTime || !currentShift.endTime) {
+      return null
+    }
 
     return {
       start: currentShift.startTime,
