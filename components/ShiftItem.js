@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 /**
  * ShiftItem Component
@@ -13,46 +13,59 @@ import { Ionicons } from "@expo/vector-icons"
  * @param {Function} onEdit - Function to call when editing the shift
  * @param {Function} onDelete - Function to call when deleting the shift
  * @param {boolean} darkMode - Whether dark mode is enabled
+ * @param {Function} t - Translation function
  */
-export default function ShiftItem({ shift, isActive, onApply, onEdit, onDelete, darkMode }) {
+export default function ShiftItem({
+  shift,
+  isActive,
+  onApply,
+  onEdit,
+  onDelete,
+  darkMode,
+  t,
+}) {
   // Handle delete with confirmation
   const handleDelete = () => {
     Alert.alert(
-      shift.t ? shift.t("delete_shift_title") : "Delete Shift",
-      shift.t ? shift.t("delete_shift_message") : "Are you sure you want to delete this shift?",
+      t ? t("delete_shift_title") : "Delete Shift",
+      t
+        ? t("delete_shift_message")
+        : "Are you sure you want to delete this shift?",
       [
         {
-          text: shift.t ? shift.t("cancel") : "Cancel",
+          text: t ? t("cancel") : "Cancel",
           style: "cancel",
         },
         {
-          text: shift.t ? shift.t("delete") : "Delete",
+          text: t ? t("delete") : "Delete",
           onPress: onDelete,
           style: "destructive",
         },
-      ],
-    )
-  }
+      ]
+    );
+  };
 
   // Handle apply with confirmation
   const handleApply = () => {
-    if (isActive) return // Already applied
+    if (isActive) return; // Already applied
 
     Alert.alert(
-      shift.t ? shift.t("apply_shift_title") : "Apply Shift",
-      shift.t ? shift.t("apply_shift_message", { name: shift.name }) : `Apply "${shift.name}" shift for this week?`,
+      t ? t("apply_shift_title") : "Apply Shift",
+      t
+        ? t("apply_shift_message", { name: shift.name })
+        : `Apply "${shift.name}" shift for this week?`,
       [
         {
-          text: shift.t ? shift.t("cancel") : "Cancel",
+          text: t ? t("cancel") : "Cancel",
           style: "cancel",
         },
         {
-          text: shift.t ? shift.t("apply") : "Apply",
+          text: t ? t("apply") : "Apply",
           onPress: onApply,
         },
-      ],
-    )
-  }
+      ]
+    );
+  };
 
   return (
     <View
@@ -60,18 +73,24 @@ export default function ShiftItem({ shift, isActive, onApply, onEdit, onDelete, 
         styles.container,
         isActive && styles.activeContainer,
         {
-          backgroundColor: isActive ? (darkMode ? "#2d2d2d" : "#f0f0f0") : "transparent",
+          backgroundColor: isActive
+            ? darkMode
+              ? "#2d2d2d"
+              : "#f0f0f0"
+            : "transparent",
         },
       ]}
     >
       <View style={styles.infoContainer}>
-        <Text style={[styles.shiftName, { color: darkMode ? "#fff" : "#000" }]}>{shift.name}</Text>
+        <Text style={[styles.shiftName, { color: darkMode ? "#fff" : "#000" }]}>
+          {shift.name}
+        </Text>
         <Text style={[styles.shiftTime, { color: darkMode ? "#bbb" : "#777" }]}>
           {shift.startTime} - {shift.endTime}
         </Text>
         {isActive && (
           <Text style={[styles.activeText, { color: "#6a5acd" }]}>
-            {shift.t ? shift.t("currently_applied") : "Currently applied for this week"}
+            {t ? t("currently_applied") : "Currently applied for this week"}
           </Text>
         )}
       </View>
@@ -80,27 +99,37 @@ export default function ShiftItem({ shift, isActive, onApply, onEdit, onDelete, 
           style={[styles.actionButton, { backgroundColor: "#6a5acd" }]}
           onPress={handleApply}
           disabled={isActive}
-          accessibilityLabel={shift.t ? shift.t("apply") : "Apply"}
+          accessibilityLabel={t ? t("apply") : "Apply"}
         >
           <Ionicons name="checkmark" size={20} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0" }]}
+          style={[
+            styles.actionButton,
+            { backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0" },
+          ]}
           onPress={onEdit}
-          accessibilityLabel={shift.t ? shift.t("edit") : "Edit"}
+          accessibilityLabel={t ? t("edit") : "Edit"}
         >
-          <Ionicons name="pencil-outline" size={20} color={darkMode ? "#fff" : "#000"} />
+          <Ionicons
+            name="pencil-outline"
+            size={20}
+            color={darkMode ? "#fff" : "#000"}
+          />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0" }]}
+          style={[
+            styles.actionButton,
+            { backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0" },
+          ]}
           onPress={handleDelete}
-          accessibilityLabel={shift.t ? shift.t("delete") : "Delete"}
+          accessibilityLabel={t ? t("delete") : "Delete"}
         >
           <Ionicons name="trash-outline" size={20} color="#ff6b6b" />
         </TouchableOpacity>
       </View>
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -144,5 +173,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: 8,
   },
-})
-
+});
