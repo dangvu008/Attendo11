@@ -395,6 +395,8 @@ export const addAttendanceLog = async (date, type) => {
 export const resetTodayAttendanceLogs = async () => {
   try {
     const today = new Date().toISOString().split("T")[0];
+
+    // Reset attendance logs
     const attendanceLogs = await safeGetItem(STORAGE_KEYS.ATTENDANCE_LOGS, {});
     delete attendanceLogs[today];
     await safeSetItem(STORAGE_KEYS.ATTENDANCE_LOGS, attendanceLogs);
@@ -407,6 +409,7 @@ export const resetTodayAttendanceLogs = async () => {
     delete dailyWorkStatus[today];
     await safeSetItem(STORAGE_KEYS.DAILY_WORK_STATUS, dailyWorkStatus);
 
+    console.log("Reset today's attendance logs and work status successfully");
     return true;
   } catch (error) {
     console.error("Error resetting today's attendance logs:", error);

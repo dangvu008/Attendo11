@@ -337,13 +337,17 @@ export const checkIfResetNeeded = async () => {
     // Get current time
     const now = new Date();
 
+    // Get last reset time
+    const lastResetTime = await safeGetItem(STORAGE_KEYS.LAST_RESET_TIME, {});
+    const lastResetForToday = lastResetTime[today];
+
     // If current time is within the reset window (between resetTime and shiftStartTime)
     if (now >= resetTime && now < shiftStartTime) {
       // Check if we've already reset today
-      const workStatus = await getDailyWorkStatus(today);
-
-      // If no work status or status is "Chưa cập nhật", we need to reset
-      if (!workStatus || workStatus.status === WORK_STATUS.NOT_UPDATED) {
+      if (!lastResetForToday) {
+        // Update last reset time
+        lastResetTime[today] = now.toISOString();
+        await safeSetItem(STORAGE_KEYS.LAST_RESET_TIME, lastResetTime);
         return true;
       }
     }

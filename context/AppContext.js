@@ -69,6 +69,35 @@ export const AppProvider = ({ children }) => {
   // Translation function
   const t = (key) => getTranslation(key, language);
 
+  // Kiểm tra và thực hiện reset tự động
+  const checkAndResetStatus = async () => {
+    try {
+      const resetNeeded = await checkIfResetNeeded();
+      if (resetNeeded) {
+        console.log("Auto reset needed, resetting today's logs...");
+        await resetTodayAttendanceLogs();
+
+        // Cập nhật state để hiển thị trạng thái ban đầu
+        setTodayLogs([]);
+
+        // Reset work status
+        const today = new Date().toISOString().split("T")[0];
+        const resetStatus = {
+          status: "Chưa cập nhật",
+          totalWorkTime: 0,
+          overtime: 0,
+          remarks: "",
+        };
+        await updateDailyWorkStatus(today, resetStatus);
+        setWorkStatus(resetStatus);
+
+        console.log("Auto reset completed successfully");
+      }
+    } catch (error) {
+      console.error("Error in auto reset check:", error);
+    }
+  };
+
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {
@@ -144,12 +173,18 @@ export const AppProvider = ({ children }) => {
 
     loadData();
 
+    // Thiết lập kiểm tra reset tự động mỗi 15 phút
+    const autoResetInterval = setInterval(checkAndResetStatus, 15 * 60 * 1000);
+
     // Cleanup function
     return () => {
       // Cleanup notification listeners if needed
       if (typeof cleanupListeners === "function") {
         cleanupListeners();
       }
+
+      // Clear auto reset interval
+      clearInterval(autoResetInterval);
     };
   }, []);
 
