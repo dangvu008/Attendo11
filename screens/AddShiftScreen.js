@@ -309,7 +309,7 @@ export default function AddShiftScreen({ navigation, route }) {
     setHasUnsavedChanges(false);
 
     // Show toast notification
-    if (Platform.OS === "android") {
+    if (Platform && Platform.OS === "android") {
       ToastAndroid.show(t("form_reset") || "Form reset", ToastAndroid.SHORT);
     }
   };

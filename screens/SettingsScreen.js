@@ -34,24 +34,20 @@ export default function SettingsScreen({ navigation }) {
   const handleToggleDarkMode = (value) => {
     const boolValue = Boolean(value);
     setDarkMode(boolValue);
-    handleUpdateSettings({ darkMode: boolValue });
   };
 
   const handleToggleSoundEnabled = (value) => {
     const boolValue = Boolean(value);
     setSoundEnabled(boolValue);
-    handleUpdateSettings({ soundEnabled: boolValue });
   };
 
   const handleToggleVibrationEnabled = (value) => {
     const boolValue = Boolean(value);
     setVibrationEnabled(boolValue);
-    handleUpdateSettings({ vibrationEnabled: boolValue });
   };
 
   const handleToggleMultiButtonMode = (value) => {
     const boolValue = Boolean(value);
-    setMultiButtonMode(boolValue);
     handleUpdateSettings({ multiButtonMode: boolValue });
   };
 
