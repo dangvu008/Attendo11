@@ -2,17 +2,17 @@
 export const formatTime = (date) => {
   // Check if date is undefined or null
   if (!date) {
-    return "--:--" // Return a default value for undefined/null dates
+    return "--:--"; // Return a default value for undefined/null dates
   }
 
   // If date is already a string, return it as is
   if (typeof date === "string") {
-    return date
+    return date;
   }
 
   // Make sure date is a valid Date object
   if (!(date instanceof Date) || isNaN(date.getTime())) {
-    return "--:--" // Return default for invalid Date objects
+    return "--:--"; // Return default for invalid Date objects
   }
 
   // Now safely call toLocaleTimeString on a valid Date object
@@ -20,8 +20,8 @@ export const formatTime = (date) => {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  })
-}
+  });
+};
 
 // Get day name
 export const getDayName = (dayIndex, t) => {
@@ -33,54 +33,53 @@ export const getDayName = (dayIndex, t) => {
     t ? t("thursday") : "Thứ Năm",
     t ? t("friday") : "Thứ Sáu",
     t ? t("saturday") : "Thứ Bảy",
-  ]
+  ];
 
-  return days[dayIndex]
-}
+  return days[dayIndex];
+};
 
-// Get days of the current week
+// Get days of the current week (starting from Monday)
 export const getWeekDays = () => {
-  const today = new Date()
-  const day = today.getDay() // 0 = Sunday, 1 = Monday, ...
+  const today = new Date();
+  const day = today.getDay(); // 0 = Sunday, 1 = Monday, ...
 
   // Calculate the start of the week (Monday)
-  const startOfWeek = new Date(today)
-  startOfWeek.setDate(today.getDate() - day + (day === 0 ? -6 : 1))
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - day + (day === 0 ? -6 : 1));
 
-  // Generate array of days for the week
-  const weekDays = []
+  // Generate array of days for the week (starting from Monday)
+  const weekDays = [];
   for (let i = 0; i < 7; i++) {
-    const date = new Date(startOfWeek)
-    date.setDate(startOfWeek.getDate() + i)
-    weekDays.push(date)
+    const date = new Date(startOfWeek);
+    date.setDate(startOfWeek.getDate() + i);
+    weekDays.push(date);
   }
 
-  return weekDays
-}
+  return weekDays;
+};
 
 // Get days of the current month
 export const getMonthDays = (date) => {
-  const year = date.getFullYear()
-  const month = date.getMonth()
+  const year = date.getFullYear();
+  const month = date.getMonth();
 
   // First day of the month
-  const firstDay = new Date(year, month, 1)
+  const firstDay = new Date(year, month, 1);
 
   // Last day of the month
-  const lastDay = new Date(year, month + 1, 0)
+  const lastDay = new Date(year, month + 1, 0);
 
   // Generate array of days for the month
-  const monthDays = []
+  const monthDays = [];
   for (let i = 1; i <= lastDay.getDate(); i++) {
-    const date = new Date(year, month, i)
-    monthDays.push(date)
+    const date = new Date(year, month, i);
+    monthDays.push(date);
   }
 
-  return monthDays
-}
+  return monthDays;
+};
 
 // Format date as YYYY-MM-DD
 export const formatDate = (date) => {
-  return date.toISOString().split("T")[0]
-}
-
+  return date.toISOString().split("T")[0];
+};

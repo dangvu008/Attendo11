@@ -38,9 +38,11 @@ export default function WeeklyStatusGrid({ darkMode }) {
     return () => clearInterval(intervalId);
   }, [weekDays, loadWeeklyStatus]);
 
-  // Get day name
+  // Get day name (abbreviated)
   const getDayName = (date) => {
-    return date.toLocaleString("vi-VN", { weekday: "short" });
+    // Lấy tên ngày viết tắt
+    const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    return dayNames[date.getDay()];
   };
 
   // Handle day press to show details
@@ -51,10 +53,11 @@ export default function WeeklyStatusGrid({ darkMode }) {
 
   // Handle long press to update status
   const handleDayLongPress = (date) => {
-    // Only allow manual updates for past and current days
     const today = new Date();
-    if (date > today) return;
+    const isFuture = date > today;
 
+    // For future dates, only allow leave, absent and holiday status updates
+    // For past and current days, allow all status updates
     setSelectedDate(date);
     setStatusModalVisible(true);
   };

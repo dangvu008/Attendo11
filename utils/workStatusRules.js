@@ -3,21 +3,18 @@ import {
   getAttendanceLogs,
   updateDailyWorkStatus,
   getDailyWorkStatus,
-  safeGetItem,
-  safeSetItem,
-  STORAGE_KEYS,
 } from "./database";
 
 // Mã trạng thái làm việc
 export const WORK_STATUS = {
-  FULL_WORK: "FULL_WORK", // Đủ công (✅ / ✔️)
-  MISSING_CHECKIN: "MISSING_CHECKIN", // Đi làm nhưng thiếu chấm công (❗!)
-  NOT_UPDATED: "NOT_UPDATED", // Chưa cập nhật (❓ hoặc --)
-  LEAVE: "LEAVE", // Nghỉ phép (📩 P)
-  SICK_LEAVE: "SICK_LEAVE", // Nghỉ bệnh (🛌 B)
-  HOLIDAY: "HOLIDAY", // Nghỉ lễ (🎌 H)
-  ABSENT: "ABSENT", // Vắng không lý do (❌ X)
-  LATE_EARLY: "LATE_EARLY", // RV - Vào muộn / Ra sớm
+  FULL_WORK: "FULL_WORK", // Đủ công
+  MISSING_CHECKIN: "MISSING_CHECKIN", // Thiếu chấm công
+  NOT_UPDATED: "NOT_UPDATED", // Chưa cập nhật
+  LEAVE: "LEAVE", // Nghỉ phép
+  SICK_LEAVE: "SICK_LEAVE", // Nghỉ bệnh
+  HOLIDAY: "HOLIDAY", // Nghỉ lễ
+  ABSENT: "ABSENT", // Vắng không lý do
+  LATE_EARLY: "LATE_EARLY", // Vào muộn / Ra sớm
 };
 
 // Ký hiệu hiển thị
@@ -29,7 +26,7 @@ export const STATUS_ICONS = {
   [WORK_STATUS.SICK_LEAVE]: "🛌",
   [WORK_STATUS.HOLIDAY]: "🎌",
   [WORK_STATUS.ABSENT]: "❌",
-  [WORK_STATUS.LATE_EARLY]: "RV",
+  [WORK_STATUS.LATE_EARLY]: "⚠️",
 };
 
 // Định nghĩa ngưỡng thời gian cho phép trễ/sớm (phút)
@@ -56,59 +53,13 @@ export const calculateWorkStatus = async (date) => {
 
     // Get attendance logs for the date
     const logs = await getAttendanceLogs(date);
-
-    // Kiểm tra nghỉ lễ
-    const isHolidayStatus = await isHoliday(date);
-    if (isHolidayStatus) {
-      return {
-        status: WORK_STATUS.HOLIDAY,
-        statusDisplay: STATUS_ICONS[WORK_STATUS.HOLIDAY],
-        totalWorkTime: 0,
-        overtime: 0,
-        remarks: "Ngày nghỉ lễ",
-      };
-    }
-
-    // Kiểm tra nghỉ phép/bệnh
-    const leaveStatus = await getLeaveStatus(date);
-    if (leaveStatus) {
-      if (leaveStatus === "LEAVE") {
-        return {
-          status: WORK_STATUS.LEAVE,
-          statusDisplay: STATUS_ICONS[WORK_STATUS.LEAVE],
-          totalWorkTime: 0,
-          overtime: 0,
-          remarks: "Nghỉ phép",
-        };
-      } else if (leaveStatus === "SICK_LEAVE") {
-        return {
-          status: WORK_STATUS.SICK_LEAVE,
-          statusDisplay: STATUS_ICONS[WORK_STATUS.SICK_LEAVE],
-          totalWorkTime: 0,
-          overtime: 0,
-          remarks: "Nghỉ bệnh",
-        };
-      }
-    }
-
-    // Nếu không có log và là ngày quá khứ, đánh dấu là vắng không lý do
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const checkDate = new Date(date);
-    checkDate.setHours(0, 0, 0, 0);
-
-    if ((!logs || logs.length === 0) && checkDate < today) {
-      return {
-        status: WORK_STATUS.ABSENT,
-        statusDisplay: STATUS_ICONS[WORK_STATUS.ABSENT],
-        totalWorkTime: 0,
-        overtime: 0,
-        remarks: "Vắng không lý do",
-      };
-    }
-
     if (!logs || logs.length === 0) {
       console.log("No attendance logs found for the date");
+
+      // Kiểm tra xem ngày này có phải ngày nghỉ lễ, phép, bệnh không
+      // Logic này sẽ cần cập nhật khi có thêm tính năng quản lý nghỉ phép/bệnh/lễ
+      // Hiện tại chúng ta chỉ đánh dấu là chưa cập nhật
+
       return {
         status: WORK_STATUS.NOT_UPDATED,
         statusDisplay: STATUS_ICONS[WORK_STATUS.NOT_UPDATED],
@@ -218,28 +169,6 @@ export const calculateWorkStatus = async (date) => {
         }
       }
 
-      // Tính tổng giờ công theo chuẩn mới
-      let totalStandardHours = 0;
-
-      // Nếu không trễ hoặc sớm (đủ công)
-      if (!isLate && !isEarly) {
-        totalStandardHours = standardWorkTime;
-      } else {
-        // Nếu là RV, tính toán giờ công thực tế (trừ đi thời gian đi muộn/về sớm)
-        totalStandardHours = standardWorkTime;
-
-        if (isLate) {
-          totalStandardHours -= lateMinutes / 60; // Trừ số phút đi muộn (quy đổi ra giờ)
-        }
-
-        if (isEarly) {
-          totalStandardHours -= earlyMinutes / 60; // Trừ số phút về sớm (quy đổi ra giờ)
-        }
-
-        // Làm tròn giá trị
-        totalStandardHours = Math.round(totalStandardHours * 10) / 10;
-      }
-
       // Nếu có tăng ca đáng kể (hơn 30 phút)
       if (overtime >= 0.5) {
         remarks +=
@@ -249,8 +178,7 @@ export const calculateWorkStatus = async (date) => {
       return {
         status,
         statusDisplay,
-        totalWorkTime: totalStandardHours, // Giờ công tính theo chuẩn mới
-        actualWorkTime: roundedActualWorkTime, // Thời gian làm việc thực tế
+        totalWorkTime: roundedActualWorkTime,
         overtime: roundedOvertime,
         remarks,
         checkInTime: checkInTime.toLocaleTimeString(),
@@ -304,61 +232,10 @@ export const calculateWorkStatus = async (date) => {
   }
 };
 
-// Check if a reset is needed
-export const checkIfResetNeeded = async () => {
-  try {
-    // Get active shift
-    const activeShift = await getActiveShift();
-    if (!activeShift || !activeShift.startTime) {
-      console.log("No active shift or shift start time found");
-      return false;
-    }
-
-    // Get today's date
-    const today = new Date().toISOString().split("T")[0];
-
-    // Parse shift start time
-    const [hours, minutes] = activeShift.startTime.split(":").map(Number);
-
-    // Check if parsing was successful
-    if (isNaN(hours) || isNaN(minutes)) {
-      console.log("Invalid shift start time format:", activeShift.startTime);
-      return false;
-    }
-
-    // Create Date object for shift start time
-    const shiftStartTime = new Date(today);
-    shiftStartTime.setHours(hours, minutes, 0, 0);
-
-    // Calculate reset time (6 hours before shift start)
-    const resetTime = new Date(shiftStartTime);
-    resetTime.setHours(resetTime.getHours() - 6);
-
-    // Get current time
-    const now = new Date();
-
-    // If current time is within the reset window (between resetTime and shiftStartTime)
-    if (now >= resetTime && now < shiftStartTime) {
-      // Check if we've already reset today
-      const workStatus = await getDailyWorkStatus(today);
-
-      // If no work status or status is "Chưa cập nhật", we need to reset
-      if (!workStatus || workStatus.status === WORK_STATUS.NOT_UPDATED) {
-        return true;
-      }
-    }
-
-    return false;
-  } catch (error) {
-    console.error("Error checking if reset is needed:", error);
-    return false;
-  }
-};
-
-// Update work status based on a new attendance log
+// Cập nhật trạng thái làm việc dựa trên log mới
 export const updateWorkStatusForNewLog = async (date, logType) => {
   try {
-    // Get current work status
+    // Lấy trạng thái làm việc hiện tại
     let workStatus = (await getDailyWorkStatus(date)) || {
       status: WORK_STATUS.NOT_UPDATED,
       statusDisplay: STATUS_ICONS[WORK_STATUS.NOT_UPDATED],
@@ -367,7 +244,7 @@ export const updateWorkStatusForNewLog = async (date, logType) => {
       remarks: "Chưa cập nhật",
     };
 
-    // Update status based on log type
+    // Cập nhật trạng thái dựa trên loại log
     switch (logType) {
       case "go_work":
         workStatus.status = WORK_STATUS.MISSING_CHECKIN;
@@ -384,12 +261,12 @@ export const updateWorkStatusForNewLog = async (date, logType) => {
         workStatus = await calculateWorkStatus(date);
         break;
       case "complete":
-        // Calculate full work status
+        // Tính toán đầy đủ trạng thái làm việc
         workStatus = await calculateWorkStatus(date);
         break;
     }
 
-    // Update work status in database
+    // Cập nhật trạng thái làm việc trong CSDL
     await updateDailyWorkStatus(date, workStatus);
 
     return workStatus;
@@ -440,130 +317,16 @@ export const calculateWeeklyStatus = async (startDate, endDate) => {
   }
 };
 
-// Kiểm tra xem ngày có phải là ngày nghỉ lễ không
-export const isHoliday = async (date) => {
-  try {
-    // Lấy danh sách ngày nghỉ lễ từ lưu trữ
-    const holidays = await safeGetItem(STORAGE_KEYS.HOLIDAYS, {});
-    const dateString =
-      typeof date === "string" ? date : date.toISOString().split("T")[0];
-
-    return holidays[dateString] ? true : false;
-  } catch (error) {
-    console.error("Lỗi khi kiểm tra ngày nghỉ lễ:", error);
-    return false;
-  }
+// Xác định ngày nghỉ lễ
+export const isHoliday = (date) => {
+  // Triển khai logic kiểm tra ngày nghỉ lễ ở đây
+  // Có thể sử dụng API bên ngoài hoặc danh sách cố định
+  return false;
 };
 
-// Kiểm tra trạng thái nghỉ phép/bệnh
+// Xác định nghỉ phép/bệnh
 export const getLeaveStatus = async (date) => {
-  try {
-    // Lấy danh sách ngày nghỉ phép/bệnh từ lưu trữ
-    const leaves = await safeGetItem(STORAGE_KEYS.LEAVES, {});
-    const dateString =
-      typeof date === "string" ? date : date.toISOString().split("T")[0];
-
-    if (leaves[dateString]) {
-      return leaves[dateString].type; // Trả về loại nghỉ ("LEAVE" hoặc "SICK_LEAVE")
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Lỗi khi kiểm tra nghỉ phép/bệnh:", error);
-    return null;
-  }
-};
-
-/**
- * Thiết lập ngày nghỉ lễ với mô tả tùy chọn
- *
- * @param {string|Date} date - Ngày cần thiết lập là nghỉ lễ
- * @param {string} description - Mô tả về ngày lễ
- * @returns {Promise<boolean>} - Kết quả thành công hay không
- */
-export const setHolidayDate = async (date, description = "") => {
-  try {
-    const dateString =
-      typeof date === "string" ? date : date.toISOString().split("T")[0];
-
-    // Cập nhật ngày nghỉ lễ
-    const holidays = await safeGetItem(STORAGE_KEYS.HOLIDAYS, {});
-    holidays[dateString] = { description };
-
-    // Lưu lại thông tin
-    const success = await safeSetItem(STORAGE_KEYS.HOLIDAYS, holidays);
-
-    // Nếu có trạng thái công việc cho ngày này, cập nhật lại
-    if (success) {
-      const workStatus = await getDailyWorkStatus(dateString);
-      if (workStatus) {
-        await updateDailyWorkStatus(dateString, {
-          status: WORK_STATUS.HOLIDAY,
-          statusDisplay: STATUS_ICONS[WORK_STATUS.HOLIDAY],
-          totalWorkTime: 0,
-          overtime: 0,
-          remarks: description || "Ngày nghỉ lễ",
-        });
-      }
-    }
-
-    return success;
-  } catch (error) {
-    console.error("Lỗi khi thiết lập ngày nghỉ lễ:", error);
-    return false;
-  }
-};
-
-/**
- * Thiết lập ngày nghỉ phép hoặc nghỉ bệnh
- *
- * @param {string|Date} date - Ngày cần thiết lập
- * @param {string} leaveType - Loại nghỉ (LEAVE hoặc SICK_LEAVE)
- * @param {string} description - Mô tả tùy chọn
- * @returns {Promise<boolean>} - Kết quả thành công hay không
- */
-export const setLeaveDate = async (date, leaveType, description = "") => {
-  try {
-    if (
-      leaveType !== WORK_STATUS.LEAVE &&
-      leaveType !== WORK_STATUS.SICK_LEAVE
-    ) {
-      console.error("Loại nghỉ không hợp lệ:", leaveType);
-      return false;
-    }
-
-    const dateString =
-      typeof date === "string" ? date : date.toISOString().split("T")[0];
-
-    // Cập nhật ngày nghỉ phép/bệnh
-    const leaves = await safeGetItem(STORAGE_KEYS.LEAVES, {});
-    leaves[dateString] = {
-      type: leaveType,
-      description,
-    };
-
-    // Lưu lại thông tin
-    const success = await safeSetItem(STORAGE_KEYS.LEAVES, leaves);
-
-    // Nếu có trạng thái công việc cho ngày này, cập nhật lại
-    if (success) {
-      const workStatus = await getDailyWorkStatus(dateString);
-      if (workStatus) {
-        await updateDailyWorkStatus(dateString, {
-          status: leaveType,
-          statusDisplay: STATUS_ICONS[leaveType],
-          totalWorkTime: 0,
-          overtime: 0,
-          remarks:
-            description ||
-            (leaveType === WORK_STATUS.LEAVE ? "Nghỉ phép" : "Nghỉ bệnh"),
-        });
-      }
-    }
-
-    return success;
-  } catch (error) {
-    console.error("Lỗi khi thiết lập ngày nghỉ phép/bệnh:", error);
-    return false;
-  }
+  // Triển khai logic lấy trạng thái nghỉ phép/bệnh từ DB
+  // Trả về null nếu không có, LEAVE hoặc SICK_LEAVE nếu có
+  return null;
 };
