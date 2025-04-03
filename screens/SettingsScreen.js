@@ -48,7 +48,7 @@ export default function SettingsScreen({ navigation }) {
 
   const handleToggleMultiButtonMode = (value) => {
     const boolValue = Boolean(value);
-    handleUpdateSettings({ multiButtonMode: boolValue });
+    setMultiButtonMode(boolValue);
   };
 
   return (
