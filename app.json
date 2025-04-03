@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Attendo11",
+    "slug": "attendo11",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "https://snack-code-uploads.s3.us-west-1.amazonaws.com/~asset/2800940fbecd3c70c79118b9d2d22e37",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "https://snack-code-uploads.s3.us-west-1.amazonaws.com/~asset/2800940fbecd3c70c79118b9d2d22e37",
+      "resizeMode": "contain",
+      "backgroundColor": "#6a5acd"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "https://snack-code-uploads.s3.us-west-1.amazonaws.com/~asset/2800940fbecd3c70c79118b9d2d22e37",
+        "backgroundColor": "#6a5acd"
+      }
+    },
+    "web": {
+      "favicon": "https://snack-code-uploads.s3.us-west-1.amazonaws.com/~asset/2800940fbecd3c70c79118b9d2d22e37"
+    },
+    "description": "A time management app for tracking work shifts and attendance"
+  }
+}
+
