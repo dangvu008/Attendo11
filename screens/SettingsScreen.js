@@ -1,11 +1,18 @@
-"use client"
+"use client";
 
-import { useContext } from "react"
-import { View, Text, Switch, ScrollView, TouchableOpacity, StyleSheet } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-import { Ionicons } from "@expo/vector-icons"
-import { AppContext } from "../context/AppContext"
-import LanguageSelector from "../components/LanguageSelector"
+import { useContext } from "react";
+import {
+  View,
+  Text,
+  Switch,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { AppContext } from "../context/AppContext";
+import LanguageSelector from "../components/LanguageSelector";
 
 export default function SettingsScreen({ navigation }) {
   const {
@@ -20,28 +27,84 @@ export default function SettingsScreen({ navigation }) {
     multiButtonMode,
     setMultiButtonMode,
     t,
-  } = useContext(AppContext)
+    handleUpdateSettings,
+  } = useContext(AppContext);
+
+  // Ensure boolean values when toggling settings
+  const handleToggleDarkMode = (value) => {
+    const boolValue = Boolean(value);
+    setDarkMode(boolValue);
+    handleUpdateSettings({ darkMode: boolValue });
+  };
+
+  const handleToggleSoundEnabled = (value) => {
+    const boolValue = Boolean(value);
+    setSoundEnabled(boolValue);
+    handleUpdateSettings({ soundEnabled: boolValue });
+  };
+
+  const handleToggleVibrationEnabled = (value) => {
+    const boolValue = Boolean(value);
+    setVibrationEnabled(boolValue);
+    handleUpdateSettings({ vibrationEnabled: boolValue });
+  };
+
+  const handleToggleMultiButtonMode = (value) => {
+    const boolValue = Boolean(value);
+    setMultiButtonMode(boolValue);
+    handleUpdateSettings({ multiButtonMode: boolValue });
+  };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? "#121212" : "#f5f5f5" }]}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: darkMode ? "#121212" : "#f5f5f5" },
+      ]}
+    >
       <View style={styles.header}>
-        <Text style={[styles.screenTitle, { color: darkMode ? "#fff" : "#000" }]}>{t("settings")}</Text>
+        <Text
+          style={[styles.screenTitle, { color: darkMode ? "#fff" : "#000" }]}
+        >
+          {t("settings")}
+        </Text>
       </View>
 
       <ScrollView style={styles.scrollView}>
-        <View style={[styles.section, { backgroundColor: darkMode ? "#1e1e1e" : "#fff" }]}>
-          <Text style={[styles.sectionTitle, { color: darkMode ? "#fff" : "#000" }]}>{t("general_settings")}</Text>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: darkMode ? "#1e1e1e" : "#fff" },
+          ]}
+        >
+          <Text
+            style={[styles.sectionTitle, { color: darkMode ? "#fff" : "#000" }]}
+          >
+            {t("general_settings")}
+          </Text>
 
           <View style={styles.settingItem}>
             <View style={styles.settingTextContainer}>
-              <Text style={[styles.settingTitle, { color: darkMode ? "#fff" : "#000" }]}>{t("dark_mode")}</Text>
-              <Text style={[styles.settingDescription, { color: darkMode ? "#bbb" : "#777" }]}>
+              <Text
+                style={[
+                  styles.settingTitle,
+                  { color: darkMode ? "#fff" : "#000" },
+                ]}
+              >
+                {t("dark_mode")}
+              </Text>
+              <Text
+                style={[
+                  styles.settingDescription,
+                  { color: darkMode ? "#bbb" : "#777" },
+                ]}
+              >
                 {t("dark_mode_description")}
               </Text>
             </View>
             <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
+              value={Boolean(darkMode)}
+              onValueChange={handleToggleDarkMode}
               trackColor={{ false: "#767577", true: "#6a5acd" }}
               thumbColor="#f4f3f4"
             />
@@ -49,23 +112,44 @@ export default function SettingsScreen({ navigation }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingTextContainer}>
-              <Text style={[styles.settingTitle, { color: darkMode ? "#fff" : "#000" }]}>{t("language")}</Text>
+              <Text
+                style={[
+                  styles.settingTitle,
+                  { color: darkMode ? "#fff" : "#000" },
+                ]}
+              >
+                {t("language")}
+              </Text>
             </View>
-            <LanguageSelector language={language} setLanguage={setLanguage} darkMode={darkMode} />
+            <LanguageSelector
+              language={language}
+              setLanguage={setLanguage}
+              darkMode={darkMode}
+            />
           </View>
 
           <View style={styles.settingItem}>
             <View style={styles.settingTextContainer}>
-              <Text style={[styles.settingTitle, { color: darkMode ? "#fff" : "#000" }]}>
+              <Text
+                style={[
+                  styles.settingTitle,
+                  { color: darkMode ? "#fff" : "#000" },
+                ]}
+              >
                 {t("notification_sound")}
               </Text>
-              <Text style={[styles.settingDescription, { color: darkMode ? "#bbb" : "#777" }]}>
+              <Text
+                style={[
+                  styles.settingDescription,
+                  { color: darkMode ? "#bbb" : "#777" },
+                ]}
+              >
                 {t("play_sound_on_notification")}
               </Text>
             </View>
             <Switch
-              value={soundEnabled}
-              onValueChange={setSoundEnabled}
+              value={Boolean(soundEnabled)}
+              onValueChange={handleToggleSoundEnabled}
               trackColor={{ false: "#767577", true: "#6a5acd" }}
               thumbColor="#f4f3f4"
             />
@@ -73,16 +157,26 @@ export default function SettingsScreen({ navigation }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingTextContainer}>
-              <Text style={[styles.settingTitle, { color: darkMode ? "#fff" : "#000" }]}>
+              <Text
+                style={[
+                  styles.settingTitle,
+                  { color: darkMode ? "#fff" : "#000" },
+                ]}
+              >
                 {t("notification_vibration")}
               </Text>
-              <Text style={[styles.settingDescription, { color: darkMode ? "#bbb" : "#777" }]}>
+              <Text
+                style={[
+                  styles.settingDescription,
+                  { color: darkMode ? "#bbb" : "#777" },
+                ]}
+              >
                 {t("vibrate_on_notification")}
               </Text>
             </View>
             <Switch
-              value={vibrationEnabled}
-              onValueChange={setVibrationEnabled}
+              value={Boolean(vibrationEnabled)}
+              onValueChange={handleToggleVibrationEnabled}
               trackColor={{ false: "#767577", true: "#6a5acd" }}
               thumbColor="#f4f3f4"
             />
@@ -90,26 +184,48 @@ export default function SettingsScreen({ navigation }) {
 
           <View style={styles.settingItem}>
             <View style={styles.settingTextContainer}>
-              <Text style={[styles.settingTitle, { color: darkMode ? "#fff" : "#000" }]}>{t("multi_button_mode")}</Text>
-              <Text style={[styles.settingDescription, { color: darkMode ? "#bbb" : "#777" }]}>
+              <Text
+                style={[
+                  styles.settingTitle,
+                  { color: darkMode ? "#fff" : "#000" },
+                ]}
+              >
+                {t("multi_button_mode")}
+              </Text>
+              <Text
+                style={[
+                  styles.settingDescription,
+                  { color: darkMode ? "#bbb" : "#777" },
+                ]}
+              >
                 {t("multi_button_mode_description")}
               </Text>
             </View>
             <Switch
-              value={multiButtonMode}
-              onValueChange={setMultiButtonMode}
+              value={Boolean(multiButtonMode)}
+              onValueChange={handleToggleMultiButtonMode}
               trackColor={{ false: "#767577", true: "#6a5acd" }}
               thumbColor="#f4f3f4"
             />
           </View>
         </View>
 
-        <View style={[styles.section, { backgroundColor: darkMode ? "#1e1e1e" : "#fff" }]}>
-          <Text style={[styles.sectionTitle, { color: darkMode ? "#fff" : "#000" }]}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: darkMode ? "#1e1e1e" : "#fff" },
+          ]}
+        >
+          <Text
+            style={[styles.sectionTitle, { color: darkMode ? "#fff" : "#000" }]}
+          >
             {t("data_management") || "Data Management"}
           </Text>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("DataManagement")}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate("DataManagement")}
+          >
             <View style={styles.menuItemContent}>
               <Ionicons
                 name="save-outline"
@@ -118,29 +234,67 @@ export default function SettingsScreen({ navigation }) {
                 style={styles.menuIcon}
               />
               <View style={styles.menuTextContainer}>
-                <Text style={[styles.menuTitle, { color: darkMode ? "#fff" : "#000" }]}>
+                <Text
+                  style={[
+                    styles.menuTitle,
+                    { color: darkMode ? "#fff" : "#000" },
+                  ]}
+                >
                   {t("data_backup_restore") || "Backup & Restore"}
                 </Text>
-                <Text style={[styles.menuDescription, { color: darkMode ? "#bbb" : "#777" }]}>
+                <Text
+                  style={[
+                    styles.menuDescription,
+                    { color: darkMode ? "#bbb" : "#777" },
+                  ]}
+                >
                   {t("manage_app_data") || "Manage your application data"}
                 </Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={darkMode ? "#bbb" : "#777"} />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={darkMode ? "#bbb" : "#777"}
+            />
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.section, { backgroundColor: darkMode ? "#1e1e1e" : "#fff" }]}>
-          <Text style={[styles.sectionTitle, { color: darkMode ? "#fff" : "#000" }]}>{t("about")}</Text>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: darkMode ? "#1e1e1e" : "#fff" },
+          ]}
+        >
+          <Text
+            style={[styles.sectionTitle, { color: darkMode ? "#fff" : "#000" }]}
+          >
+            {t("about")}
+          </Text>
           <View style={styles.aboutContainer}>
-            <Text style={[styles.appName, { color: darkMode ? "#fff" : "#000" }]}>Attendo11</Text>
-            <Text style={[styles.appVersion, { color: darkMode ? "#bbb" : "#777" }]}>Version 1.0.0</Text>
-            <Text style={[styles.appDescription, { color: darkMode ? "#bbb" : "#777" }]}>{t("app_description")}</Text>
+            <Text
+              style={[styles.appName, { color: darkMode ? "#fff" : "#000" }]}
+            >
+              Attendo11
+            </Text>
+            <Text
+              style={[styles.appVersion, { color: darkMode ? "#bbb" : "#777" }]}
+            >
+              Version 1.0.0
+            </Text>
+            <Text
+              style={[
+                styles.appDescription,
+                { color: darkMode ? "#bbb" : "#777" },
+              ]}
+            >
+              {t("app_description")}
+            </Text>
           </View>
         </View>
       </ScrollView>
     </SafeAreaView>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -238,5 +392,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
   },
-})
-
+});
