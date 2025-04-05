@@ -1,5 +1,7 @@
 "use client"
 
+import { useCallback } from "react"
+
 import { useState, useContext, useEffect } from "react"
 import { AppContext } from "../context/AppContext"
 import {
@@ -212,14 +214,28 @@ export default function AddShiftScreen({ navigation, route }) {
   // Thêm state để kiểm tra form có hợp lệ không
   const [isFormValid, setIsFormValid] = useState(false)
 
+  const validateShiftNameMemoized = useCallback(validateShiftName, [shifts, isEditing, editingShift, t, name])
+  const validateDepartureAndStartTimeMemoized = useCallback(validateDepartureAndStartTime, [
+    departureTime,
+    startTime,
+    t,
+  ])
+  const validateStartAndOfficeEndTimeMemoized = useCallback(validateStartAndOfficeEndTime, [
+    startTime,
+    officeEndTime,
+    t,
+  ])
+  const validateOfficeEndAndEndTimeMemoized = useCallback(validateOfficeEndAndEndTime, [officeEndTime, endTime, t])
+  const validateDaysAppliedMemoized = useCallback(validateDaysApplied, [daysApplied, t])
+
   // Thêm useEffect để validate form khi các giá trị thay đổi
   useEffect(() => {
     // Validate tất cả các trường
-    const nameValidation = validateShiftName()
-    const departureStartValidation = validateDepartureAndStartTime()
-    const startOfficeEndValidation = validateStartAndOfficeEndTime()
-    const officeEndEndValidation = validateOfficeEndAndEndTime()
-    const daysAppliedValidation = validateDaysApplied()
+    const nameValidation = validateShiftNameMemoized()
+    const departureStartValidation = validateDepartureAndStartTimeMemoized()
+    const startOfficeEndValidation = validateStartAndOfficeEndTimeMemoized()
+    const officeEndEndValidation = validateOfficeEndAndEndTimeMemoized()
+    const daysAppliedValidation = validateDaysAppliedMemoized()
 
     // Cập nhật state lỗi validation
     setValidationErrors({
@@ -248,9 +264,11 @@ export default function AddShiftScreen({ navigation, route }) {
     shifts,
     isEditing,
     editingShift,
-    shifts,
-    isEditing,
-    editingShift,
+    validateShiftNameMemoized,
+    validateDepartureAndStartTimeMemoized,
+    validateStartAndOfficeEndTimeMemoized,
+    validateOfficeEndAndEndTimeMemoized,
+    validateDaysAppliedMemoized,
   ])
 
   // Cập nhật hàm saveShift để kiểm tra validation trước khi lưu

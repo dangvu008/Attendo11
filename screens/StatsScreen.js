@@ -1,6 +1,6 @@
 "use client"
 
-import { useContext, useState, useEffect } from "react"
+import { useContext, useState, useEffect, useCallback } from "react"
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
@@ -21,12 +21,7 @@ export default function StatsScreen({ navigation }) {
   const monthName = currentMonth.toLocaleString("vi-VN", { month: "long", year: "numeric" })
 
   // Load monthly statistics
-  useEffect(() => {
-    loadMonthlyStats()
-  }, [currentMonth])
-
-  // Load monthly statistics data
-  const loadMonthlyStats = async () => {
+  const loadMonthlyStats = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -114,7 +109,11 @@ export default function StatsScreen({ navigation }) {
       console.error("Error loading monthly stats:", error)
       setIsLoading(false)
     }
-  }
+  }, [currentMonth, currentShift])
+
+  useEffect(() => {
+    loadMonthlyStats()
+  }, [currentMonth, loadMonthlyStats])
 
   // Go to previous month
   const goToPreviousMonth = () => {

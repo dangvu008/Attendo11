@@ -25,7 +25,6 @@ import {
   createDataBackup,
   restoreFromBackup,
   exportAllData,
-  importData,
 } from "../utils/database"
 import {
   configureNotifications,
@@ -40,6 +39,137 @@ import { validateTimeInterval } from "../utils/timeRules"
 import { updateWorkStatusForNewLog } from "../utils/workStatusUtils"
 import { scheduleAutomaticBackup } from "../utils/dataBackupUtils"
 import { Alert } from "react-native"
+import { View, Text, Modal, StyleSheet, TouchableOpacity, Vibration } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
+import * as KeepAwake from "expo-keep-awake"
+
+/**
+ * AlarmModal Component
+ *
+ * This component displays a modal alarm with title, message, and dismiss button.
+ * It includes vibration feedback and keeps the screen awake while displayed.
+ *
+ * @param {boolean} visible - Whether the modal is visible
+ * @param {string} title - Alarm title
+ * @param {string} message - Alarm message
+ * @param {function} onDismiss - Function to call when alarm is dismissed
+ * @param {boolean} darkMode - Whether dark mode is enabled
+ */
+const AlarmModal = ({ visible, title, message, onDismiss, darkMode = true }) => {
+  const [isVibrating, setIsVibrating] = useState(false)
+
+  // Start vibration when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      // Keep screen awake
+      KeepAwake.activateKeepAwake()
+
+      // Start vibration pattern
+      startVibration()
+
+      return () => {
+        // Clean up when component unmounts or modal hides
+        stopVibration()
+        KeepAwake.deactivateKeepAwake()
+      }
+    }
+  }, [visible])
+
+  // Start vibration pattern
+  const startVibration = () => {
+    setIsVibrating(true)
+    Vibration.vibrate([0, 500, 500], true)
+  }
+
+  // Stop vibration
+  const stopVibration = () => {
+    setIsVibrating(false)
+    Vibration.cancel()
+  }
+
+  // Handle dismiss button press
+  const handleDismiss = () => {
+    stopVibration()
+    KeepAwake.deactivateKeepAwake()
+    onDismiss()
+  }
+
+  return (
+    <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={handleDismiss}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: darkMode ? "#1e1e1e" : "#fff" }]}>
+          <View style={styles.alarmIconContainer}>
+            <Ionicons name="alarm" size={48} color="#6a5acd" />
+          </View>
+
+          <Text style={[styles.alarmTitle, { color: darkMode ? "#fff" : "#000" }]}>{title || "Alarm"}</Text>
+
+          <Text style={[styles.alarmMessage, { color: darkMode ? "#bbb" : "#555" }]}>
+            {message || "Time to take action!"}
+          </Text>
+
+          <TouchableOpacity style={[styles.dismissButton, { backgroundColor: "#6a5acd" }]} onPress={handleDismiss}>
+            <Text style={styles.dismissButtonText}>Dismiss</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+  },
+  modalContent: {
+    width: "80%",
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  alarmIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(106, 90, 205, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  alarmTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  alarmMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  dismissButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: "center",
+  },
+  dismissButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+})
+
+export default AlarmModal
 
 // Create context
 export const AppContext = createContext()
@@ -90,7 +220,6 @@ export const AppProvider = ({ children }) => {
         // Setup notification listeners
         const { removeNotificationListeners } = setupNotificationListeners()
         const cleanupListeners = removeNotificationListeners
-
         // Check if reset is needed
         const resetNeeded = await checkIfResetNeeded()
         if (resetNeeded) {
@@ -200,10 +329,7 @@ export const AppProvider = ({ children }) => {
 
   // Update an existing shift
   const handleUpdateShift = async (updatedShift) => {
-    try {
-      const success = await updateShiftDB(updatedShift)
-      if (success) {
-        //  => {
+    //  => {
     try {
       const success = await updateShiftDB(updatedShift)
       if (success) {
@@ -550,5 +676,77 @@ export const AppProvider = ({ children }) => {
       if (jsonData) {
         // Share data
         // Note: In a real app, you would use Share API or save to a file
-        Aler
+        Alert.alert("Data Export", "Data exported successfully. Check your device's storage.")
+      } else {
+        Alert.alert("Export Error", "Failed to export data")
+      }
+    } catch (error) {
+      console.error("Error exporting data:", error)
+      Alert.alert("Export Error", "An error occurred while exporting data: " + error.message)
+    }
+  }
+
+  return (
+    <AppContext.Provider
+      value={{
+        darkMode,
+        setDarkMode,
+        language,
+        setLanguage,
+        soundEnabled,
+        setSoundEnabled,
+        vibrationEnabled,
+        setVibrationEnabled,
+        multiButtonMode,
+        setMultiButtonMode,
+        alarmEnabled,
+        setAlarmEnabled,
+        shifts,
+        setShifts,
+        currentShift,
+        setCurrentShift,
+        todayLogs,
+        setTodayLogs,
+        workStatus,
+        setWorkStatus,
+        notes,
+        setNotes,
+        weeklyStatus,
+        setWeeklyStatus,
+        isLoading,
+        setIsLoading,
+        dataError,
+        setDataError,
+        t,
+        handleUpdateSettings,
+        handleAddShift,
+        handleUpdateShift,
+        handleDeleteShift,
+        handleSetActiveShift,
+        handleAddAttendanceLog,
+        handleResetTodayLogs,
+        handleAddNote,
+        handleUpdateNote,
+        handleDeleteNote,
+        handleShowAlarm,
+        handleDismissAlarm,
+        showAlarmModal,
+        alarmData,
+        handleCreateBackup,
+        handleRestoreBackup,
+        handleExportData,
+      }}
+    >
+      {/* Alarm Modal */}
+      <AlarmModal
+        visible={showAlarmModal}
+        title={alarmData?.title}
+        message={alarmData?.message}
+        onDismiss={handleDismissAlarm}
+        darkMode={darkMode}
+      />
+      {children}
+    </AppContext.Provider>
+  )
+}
 
