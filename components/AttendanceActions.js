@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { AppContext } from "../context/AppContext"
 import { validateTimeInterval, formatTimestamp, getStatusIndicator } from "../utils/timeRules"
 import { cancelNotificationsByType } from "../utils/notificationUtils"
+import { validateCheckInTime, validateCheckOutTime, calculateWorkHours } from "../utils/shiftValidation"
 
 /**
  * AttendanceActions Component
@@ -19,11 +20,21 @@ import { cancelNotificationsByType } from "../utils/notificationUtils"
  * @param {boolean} darkMode - Whether dark mode is enabled
  */
 const AttendanceActions = ({ darkMode }) => {
-  const { todayLogs, addAttendanceLog, resetTodayLogs, currentShift, t, soundEnabled, vibrationEnabled } =
-    useContext(AppContext)
+  const {
+    todayLogs,
+    addAttendanceLog,
+    resetTodayLogs,
+    currentShift,
+    t,
+    soundEnabled,
+    vibrationEnabled,
+    updateDailyWorkStatus,
+    refreshWeeklyStatus,
+  } = useContext(AppContext)
 
   const [actionDisabled, setActionDisabled] = useState(false)
   const [currentAction, setCurrentAction] = useState("go_work")
+  const [multiButtonMode, setMultiButtonMode] = useState(true) // Default to multi-button mode
 
   // Determine the current action based on logs
   useEffect(() => {
@@ -71,6 +82,67 @@ const AttendanceActions = ({ darkMode }) => {
       return
     }
 
+    // For single-button mode (only "Go to Work" button)
+    // If we're in single-button mode and the user presses the button, consider it as completed
+    if (!multiButtonMode && currentAction === "go_work") {
+      // Perform all actions in sequence
+      await performAction() // Go to work
+      await performAction(true, "check_in") // Check in
+      await performAction(true, "check_out") // Check out
+      await performAction(true, "complete") // Complete
+      return
+    }
+
+    // Check if we have an active shift
+    if (!currentShift && (currentAction === "check_in" || currentAction === "check_out")) {
+      Alert.alert(
+        t("no_active_shift") || "No Active Shift",
+        t("no_active_shift_message") || "You don't have an active shift assigned. Please set up a shift first.",
+        [{ text: t("ok") || "OK", style: "default" }],
+      )
+      return
+    }
+
+    // Validate check-in time against shift
+    if (currentAction === "check_in" && currentShift) {
+      const now = new Date()
+      const validation = validateCheckInTime(now, currentShift)
+
+      if (!validation.isValid) {
+        Alert.alert(t("invalid_check_in_time") || "Invalid Check-in Time", validation.message, [
+          { text: t("cancel") || "Cancel", style: "cancel" },
+          {
+            text: t("check_in_anyway") || "Check In Anyway",
+            style: "destructive",
+            onPress: () => performAction(true),
+          },
+        ])
+        return
+      }
+    }
+
+    // Validate check-out time against shift and check-in time
+    if (currentAction === "check_out" && currentShift) {
+      const checkInLog = todayLogs.find((log) => log.type === "check_in")
+      if (checkInLog) {
+        const checkInTime = new Date(checkInLog.timestamp)
+        const now = new Date()
+        const validation = validateCheckOutTime(now, checkInTime, currentShift)
+
+        if (!validation.isValid) {
+          Alert.alert(t("invalid_check_out_time") || "Invalid Check-out Time", validation.message, [
+            { text: t("cancel") || "Cancel", style: "cancel" },
+            {
+              text: t("check_out_anyway") || "Check Out Anyway",
+              style: "destructive",
+              onPress: () => performAction(true),
+            },
+          ])
+          return
+        }
+      }
+    }
+
     // Get previous action log for time validation
     let previousActionType = null
     let previousActionTime = null
@@ -93,8 +165,33 @@ const AttendanceActions = ({ darkMode }) => {
     const validation = validateTimeInterval(previousActionType, previousActionTime, currentAction)
 
     if (!validation.isValid) {
+      // Parse message to get translation key and parameters
+      let messageKey = validation.message
+      let params = {}
+
+      if (validation.message && validation.message.includes("|")) {
+        const [key, value] = validation.message.split("|")
+        messageKey = key
+
+        // Check which parameter to use based on the key
+        if (key === "time_rule_violation_message_check_in") {
+          params = { seconds: value }
+        } else if (key === "time_rule_violation_message_check_out") {
+          params = { minutes: value }
+        }
+      }
+
+      // Format the message with parameters
+      let formattedMessage = t(messageKey) || validation.message
+      if (params.seconds) {
+        formattedMessage = formattedMessage.replace("{seconds}", params.seconds)
+      }
+      if (params.minutes) {
+        formattedMessage = formattedMessage.replace("{minutes}", params.minutes)
+      }
+
       // Show confirmation dialog if time rule is violated
-      Alert.alert(t("time_rule_violation") || "Time Rule Violation", validation.message, [
+      Alert.alert(t("time_rule_violation") || "Time Rule Violation", formattedMessage, [
         {
           text: t("cancel") || "Cancel",
           style: "cancel",
@@ -112,7 +209,7 @@ const AttendanceActions = ({ darkMode }) => {
   }
 
   // Perform the action (add attendance log)
-  const performAction = async (force = false) => {
+  const performAction = async (force = false, overrideAction = null) => {
     try {
       // Phản hồi xúc giác nếu được bật
       if (vibrationEnabled) {
@@ -120,29 +217,60 @@ const AttendanceActions = ({ darkMode }) => {
       }
 
       const today = new Date().toISOString().split("T")[0]
-      const result = await addAttendanceLog(currentAction, force)
+      const actionToPerform = overrideAction || currentAction
+      const result = await addAttendanceLog(actionToPerform, force)
 
       if (result.success) {
         // Hủy thông báo tương ứng
-        if (currentAction === "go_work") {
+        if (actionToPerform === "go_work") {
           await cancelNotificationsByType("departure")
-        } else if (currentAction === "check_in") {
+        } else if (actionToPerform === "check_in") {
           await cancelNotificationsByType("check-in")
-        } else if (currentAction === "check_out") {
+        } else if (actionToPerform === "check_out") {
           await cancelNotificationsByType("check-out")
         }
 
-        // Show success message
-        const actionMessages = {
-          go_work: t("went_to_work_success") || "You have successfully marked that you are going to work.",
-          check_in: t("checked_in_success") || "You have successfully checked in.",
-          check_out: t("checked_out_success") || "You have successfully checked out.",
-          complete: t("completed_success") || "You have successfully completed your work for today.",
+        // If this is a check-out action, calculate work hours
+        if (actionToPerform === "check_out" && currentShift) {
+          const checkInLog = todayLogs.find((log) => log.type === "check_in")
+          if (checkInLog) {
+            const checkInTime = new Date(checkInLog.timestamp)
+            const checkOutTime = new Date()
+
+            // Calculate work hours
+            const { regularHours, overtimeHours } = calculateWorkHours(checkInTime, checkOutTime, currentShift)
+
+            // Update work status with calculated hours
+            const workStatus = {
+              status: overtimeHours > 0 ? "OT" : "Đủ công",
+              totalWorkTime: regularHours,
+              overtime: overtimeHours,
+              remarks:
+                overtimeHours > 0
+                  ? `Làm việc ${regularHours.toFixed(1)} giờ thông thường và ${overtimeHours.toFixed(1)} giờ tăng ca`
+                  : `Làm việc ${regularHours.toFixed(1)} giờ thông thường`,
+            }
+
+            // Update daily work status
+            await updateDailyWorkStatus(today, workStatus)
+            refreshWeeklyStatus()
+          }
         }
 
-        Alert.alert(t("success") || "Success", actionMessages[currentAction], [
-          { text: t("ok") || "OK", style: "default" },
-        ])
+        // Only show success message if not in override mode (used for single-button flow)
+        if (!overrideAction) {
+          // Show success message
+          const actionMessages = {
+            go_work: t("went_to_work_success") || "You have successfully marked that you are going to work.",
+            check_in: t("checked_in_success") || "You have successfully checked in.",
+            check_out: t("checked_out_success") || "You have successfully checked out.",
+            complete: t("completed_success") || "You have successfully completed your work for today.",
+          }
+
+          Alert.alert(t("success") || "Success", actionMessages[actionToPerform], [
+            { text: t("ok") || "OK", style: "default" },
+          ])
+        }
       } else if (result.needsConfirmation) {
         // This case is handled by handleActionPress
       } else {
@@ -175,6 +303,9 @@ const AttendanceActions = ({ darkMode }) => {
           onPress: async () => {
             try {
               const success = await resetTodayLogs()
+              if (success) {
+                refreshWeeklyStatus()
+              }
               if (!success) {
                 Alert.alert(
                   t("error") || "Error",
@@ -232,7 +363,7 @@ const AttendanceActions = ({ darkMode }) => {
     if (todayLogs.length === 0) {
       return (
         <View style={styles.emptyHistoryContainer}>
-          <Text style={[styles.emptyHistoryText, { color: darkMode ? "#bbb" : "#777" }]}>
+          <Text style={{ color: darkMode ? "#bbb" : "#777", fontSize: 16, fontStyle: "italic" }}>
             {t("no_attendance_records") || "No attendance records for today."}
           </Text>
         </View>
@@ -244,14 +375,14 @@ const AttendanceActions = ({ darkMode }) => {
 
     return (
       <View style={styles.historyContainer}>
-        <Text style={[styles.historyTitle, { color: darkMode ? "#fff" : "#000" }]}>
+        <Text style={{ color: darkMode ? "#fff" : "#000", fontSize: 18, fontWeight: "bold", marginBottom: 12 }}>
           {t("today_history") || "Today's History"}
         </Text>
 
         {sortedLogs.map((log, index) => (
           <View key={log.id || index} style={styles.historyItem}>
-            <Text style={[styles.historyIndicator]}>{getStatusIndicator(log.type)}</Text>
-            <Text style={[styles.historyAction, { color: darkMode ? "#fff" : "#000" }]}>
+            <Text style={{ fontSize: 18, marginRight: 10 }}>{getStatusIndicator(log.type)}</Text>
+            <Text style={{ flex: 1, fontSize: 16, color: darkMode ? "#fff" : "#000" }}>
               {(() => {
                 switch (log.type) {
                   case "go_work":
@@ -267,9 +398,7 @@ const AttendanceActions = ({ darkMode }) => {
                 }
               })()}
             </Text>
-            <Text style={[styles.historyTime, { color: darkMode ? "#bbb" : "#777" }]}>
-              {formatTimestamp(log.timestamp)}
-            </Text>
+            <Text style={{ fontSize: 14, color: darkMode ? "#bbb" : "#777" }}>{formatTimestamp(log.timestamp)}</Text>
           </View>
         ))}
       </View>
@@ -356,11 +485,6 @@ const styles = StyleSheet.create({
     marginTop: 30,
     paddingHorizontal: 16,
   },
-  historyTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
   historyItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -369,24 +493,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0, 0, 0, 0.05)",
   },
-  historyIndicator: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  historyAction: {
-    flex: 1,
-    fontSize: 16,
-  },
-  historyTime: {
-    fontSize: 14,
-  },
   emptyHistoryContainer: {
     marginTop: 30,
     alignItems: "center",
-  },
-  emptyHistoryText: {
-    fontSize: 16,
-    fontStyle: "italic",
   },
 })
 

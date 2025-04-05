@@ -1,3 +1,9 @@
+/**
+ * Translation Utility
+ *
+ * This module provides a function for retrieving translations based on a key and language.
+ */
+
 // Translations
 const translations = {
   en: {
@@ -18,13 +24,12 @@ const translations = {
     close: "Close",
     discard: "Discard",
     unsaved_changes: "Unsaved Changes",
-    unsaved_changes_message:
-      "You have unsaved changes. Are you sure you want to go back?",
+    unsaved_changes_message: "You have unsaved changes. Are you sure you want to go back?",
     reset_form: "Reset Form",
-    reset_form_confirmation:
-      "Are you sure you want to reset the form? All unsaved changes will be lost.",
+    reset_form_confirmation: "Are you sure you want to reset the form? All unsaved changes will be lost.",
     unexpected_error: "An unexpected error occurred. Please try again.",
     form_reset: "Form reset",
+    loading_stats: "Loading statistics...",
 
     // Accessibility
     save_note_hint: "Save the note",
@@ -47,27 +52,31 @@ const translations = {
     notes: "Notes",
     add_note: "Add Note",
     reset_confirmation_title: "Reset Work Status",
-    reset_confirmation_message:
-      "Are you sure you want to reset today's work status?",
+    reset_confirmation_message: "Are you sure you want to reset today's work status?",
     already_completed_title: "Already Completed",
-    already_completed_message:
-      "You have already completed your work for today.",
+    already_completed_message: "You have already completed your work for today.",
     work_status: "Work Status",
     status: "Status",
     work_time: "Work Time",
     overtime: "Overtime",
     time_rule_violation: "Time Rule Violation",
-    went_to_work_success:
-      "You have successfully marked that you are going to work.",
+    went_to_work_success: "You have successfully marked that you are going to work.",
     checked_in_success: "You have successfully checked in.",
     checked_out_success: "You have successfully checked out.",
     completed_success: "You have successfully completed your work for today.",
     today_history: "Today's History",
     no_attendance_records: "No attendance records for today.",
-    error_recording_attendance:
-      "There was an error recording your attendance. Please try again.",
-    error_resetting_logs:
-      "There was an error resetting the logs. Please try again.",
+    error_recording_attendance: "There was an error recording your attendance. Please try again.",
+    error_resetting_logs: "There was an error resetting the logs. Please try again.",
+    no_active_shift: "No Active Shift",
+    no_active_shift_message: "You don't have an active shift assigned. Please set up a shift first.",
+    invalid_check_in_time: "Invalid Check-in Time",
+    check_in_anyway: "Check In Anyway",
+    invalid_check_out_time: "Invalid Check-out Time",
+    check_out_anyway: "Check Out Anyway",
+    wait_go_to_work_check_in:
+      'You should wait at least 5 minutes between "Go to Work" and "Check-in". Please wait {seconds} more seconds.',
+    work_at_least_2_hours: "You should work at least 2 hours before checking out. Please wait {minutes} more minutes.",
 
     // Settings Screen
     work_shifts: "Work Shifts",
@@ -82,8 +91,7 @@ const translations = {
     notification_vibration: "Notification Vibration",
     vibrate_on_notification: "Vibrate when notifications appear",
     multi_button_mode: "Multi-Button Mode",
-    multi_button_mode_description:
-      'Show all check-in/out functions instead of just "Go to Work"',
+    multi_button_mode_description: 'Show all check-in/out functions instead of just "Go to Work"',
     currently_applied: "Currently applied for this week",
     about: "About",
     app_description:
@@ -105,14 +113,12 @@ const translations = {
     days_applied: "Days Applied",
     name_required: "Shift name is required",
     name_too_long: "Shift name cannot exceed {limit} characters",
-    name_special_chars:
-      "Shift name can only contain letters, numbers, spaces, and underscores",
+    name_special_chars: "Shift name cannot contain special characters",
     name_duplicate: "A shift with this name already exists",
     save_shift: "Save Work Shift",
     save_shift_confirmation: "Are you sure you want to save this work shift?",
     update_shift: "Update Work Shift",
-    update_shift_confirmation:
-      "Are you sure you want to update this work shift?",
+    update_shift_confirmation: "Are you sure you want to update this work shift?",
     apply_shift_title: "Apply Shift",
     apply_shift_message: 'Apply "{name}" shift for this week?',
     delete_shift_title: "Delete Shift",
@@ -123,14 +129,10 @@ const translations = {
     shift_saved_message: "Your work shift has been saved successfully.",
     shift_updated: "Shift Updated",
     shift_updated_message: "Your work shift has been updated successfully.",
-    error_saving_shift:
-      "There was an error saving your work shift. Please try again.",
-    error_updating_shift:
-      "There was an error updating your work shift. Please try again.",
-    error_deleting_shift:
-      "There was an error deleting the shift. Please try again.",
-    error_applying_shift:
-      "There was an error applying the shift. Please try again.",
+    error_saving_shift: "There was an error saving your work shift. Please try again.",
+    error_updating_shift: "There was an error updating your work shift. Please try again.",
+    error_deleting_shift: "There was an error deleting the shift. Please try again.",
+    error_applying_shift: "There was an error applying the shift. Please try again.",
 
     // Note Screen
     edit_note: "Edit Note",
@@ -140,6 +142,7 @@ const translations = {
     enter_content: "Enter content",
     reminder_time: "Reminder Time",
     days_to_show: "Days to Show",
+    days_to_show_description: "Select days when this note should appear.",
     title_required: "Title is required",
     content_required: "Content is required",
     title_too_long: "Title cannot exceed {limit} characters",
@@ -154,12 +157,16 @@ const translations = {
     note_updated: "Note Updated",
     note_updated_message: "Your note has been updated successfully.",
     error_saving_note: "There was an error saving your note. Please try again.",
-    error_updating_note:
-      "There was an error updating your note. Please try again.",
+    error_updating_note: "There was an error updating your note. Please try again.",
     delete_note: "Delete Note",
     delete_note_confirmation: 'Are you sure you want to delete "{title}"?',
-    error_deleting_note:
-      "There was an error deleting the note. Please try again.",
+    error_deleting_note: "There was an error deleting the note. Please try again.",
+    note_duplicate: "A note with this title and content already exists.",
+    link_to_shifts: "Link to Work Shifts (Optional)",
+    link_to_shifts_description:
+      "Select shifts to associate this note with. If none selected, you must specify days below.",
+    no_shifts_available: "No work shifts available. Create shifts first.",
+    days_required: "Please select at least one day",
 
     // Stats Screen
     monthly_stats: "Monthly Stats",
@@ -169,6 +176,12 @@ const translations = {
     ot_150: "OT 150%",
     ot_200: "OT 200%",
     ot_300: "OT 300%",
+    monthly_summary: "Monthly Summary",
+    total_regular_hours: "Total Regular Hours",
+    total_ot_150: "Total OT 150%",
+    total_ot_200: "Total OT 200%",
+    total_ot_300: "Total OT 300%",
+    grand_total: "Grand Total",
 
     // Days
     sunday: "Sunday",
@@ -178,6 +191,13 @@ const translations = {
     thursday: "Thursday",
     friday: "Friday",
     saturday: "Saturday",
+    sun: "Sun",
+    mon: "Mon",
+    tue: "Tue",
+    wed: "Wed",
+    thu: "Thu",
+    fri: "Fri",
+    sat: "Sat",
 
     data_management: "Data Management",
     data_backup_restore: "Backup & Restore",
@@ -197,8 +217,15 @@ const translations = {
     auto_backup: "Auto Backup",
     daily: "Daily",
     please_wait: "Please wait...",
-    export_import_description:
-      "Export your data to a file or import from a previously exported file.",
+    export_import_description: "Export your data to a file or import from a previously exported file.",
+
+    // Validation errors
+    departure_start_time_error: "Departure time must be at least 5 minutes before start time",
+    start_office_end_order_error: "Start time must be before office end time",
+    start_office_end_duration_error: "Office end time must be at least 2 hours after start time",
+    office_end_end_order_error: "End time must be equal to or after office end time",
+    office_end_end_ot_error: "If there is overtime, end time must be at least 30 minutes after office end time",
+    days_applied_error: "Please select at least one day",
   },
   vi: {
     // General
@@ -207,7 +234,7 @@ const translations = {
     save: "Lưu",
     update: "Cập nhật",
     delete: "Xóa",
-    reset: "Đặt lại",
+    reset: "Thiết lập lại",
     apply: "Áp dụng",
     error: "Lỗi",
     ok: "OK",
@@ -216,155 +243,166 @@ const translations = {
     proceed_anyway: "Vẫn tiếp tục",
     update_status: "Cập nhật trạng thái",
     close: "Đóng",
-    discard: "Hủy bỏ",
-    unsaved_changes: "Thay đổi chưa lưu",
-    unsaved_changes_message:
-      "Bạn có thay đổi chưa lưu. Bạn có chắc chắn muốn quay lại không?",
+    discard: "Bỏ",
+    unsaved_changes: "Thay đổi chưa được lưu",
+    unsaved_changes_message: "Bạn có những thay đổi chưa được lưu. Bạn có chắc chắn muốn quay lại?",
     reset_form: "Đặt lại biểu mẫu",
-    reset_form_confirmation:
-      "Bạn có chắc chắn muốn đặt lại biểu mẫu? Tất cả các thay đổi chưa lưu sẽ bị mất.",
+    reset_form_confirmation: "Bạn có chắc chắn muốn đặt lại biểu mẫu? Tất cả các thay đổi chưa lưu sẽ bị mất.",
     unexpected_error: "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.",
     form_reset: "Đã đặt lại biểu mẫu",
+    loading_stats: "Đang tải thống kê...",
 
     // Accessibility
     save_note_hint: "Lưu ghi chú",
     update_note_hint: "Cập nhật ghi chú",
     save_shift_hint: "Lưu ca làm việc",
     update_shift_hint: "Cập nhật ca làm việc",
-    reset_form_hint: "Đặt lại tất cả các trường biểu mẫu",
+    reset_form_hint: "Đặt lại tất cả các trường trong biểu mẫu",
 
     // Home Screen
     go_to_work: "Đi làm",
     check_in: "Chấm công vào",
     check_out: "Chấm công ra",
-    complete: "Hoàn tất",
-    completed: "Đã hoàn tất",
+    complete: "Hoàn thành",
+    completed: "Đã hoàn thành",
     not_started_yet: "Chưa bắt đầu",
     went_to_work: "Đã đi làm",
     checked_in: "Đã chấm công vào",
     checked_out: "Đã chấm công ra",
-    weekly_status: "Trạng thái tuần này",
+    weekly_status: "Trạng thái hàng tuần",
     notes: "Ghi chú",
     add_note: "Thêm ghi chú",
-    reset_confirmation_title: "Đặt lại trạng thái",
-    reset_confirmation_message:
-      "Bạn có chắc muốn đặt lại trạng thái làm việc hôm nay?",
+    reset_confirmation_title: "Thiết lập lại trạng thái làm việc",
+    reset_confirmation_message: "Bạn có chắc chắn muốn thiết lập lại trạng thái làm việc hôm nay?",
     already_completed_title: "Đã hoàn thành",
-    already_completed_message: "Bạn đã hoàn thành công việc cho ngày hôm nay.",
+    already_completed_message: "Bạn đã hoàn thành công việc trong ngày hôm nay.",
     work_status: "Trạng thái làm việc",
     status: "Trạng thái",
     work_time: "Thời gian làm việc",
     overtime: "Tăng ca",
     time_rule_violation: "Vi phạm quy tắc thời gian",
-    went_to_work_success: "Bạn đã đánh dấu thành công rằng bạn đang đi làm.",
+    went_to_work_success: "Bạn đã đánh dấu đi làm thành công.",
     checked_in_success: "Bạn đã chấm công vào thành công.",
     checked_out_success: "Bạn đã chấm công ra thành công.",
-    completed_success: "Bạn đã hoàn thành công việc cho ngày hôm nay.",
+    completed_success: "Bạn đã hoàn thành công việc trong ngày hôm nay thành công.",
     today_history: "Lịch sử hôm nay",
-    no_attendance_records: "Không có bản ghi chấm công cho hôm nay.",
-    error_recording_attendance:
-      "Đã xảy ra lỗi khi ghi lại chấm công của bạn. Vui lòng thử lại.",
-    error_resetting_logs:
-      "Đã xảy ra lỗi khi đặt lại nhật ký. Vui lòng thử lại.",
+    no_attendance_records: "Không có bản ghi chấm công nào cho hôm nay.",
+    error_recording_attendance: "Đã xảy ra lỗi khi ghi lại thông tin chấm công của bạn. Vui lòng thử lại.",
+    error_resetting_logs: "Đã xảy ra lỗi khi thiết lập lại nhật ký. Vui lòng thử lại.",
+    no_active_shift: "Không có ca làm việc",
+    no_active_shift_message: "Bạn chưa được gán ca làm việc. Vui lòng thiết lập ca làm việc trước.",
+    invalid_check_in_time: "Thời gian chấm công vào không hợp lệ",
+    check_in_anyway: "Vẫn chấm công vào",
+    invalid_check_out_time: "Thời gian chấm công ra không hợp lệ",
+    check_out_anyway: "Vẫn chấm công ra",
+    wait_go_to_work_check_in:
+      'Bạn nên đợi ít nhất 5 phút giữa "Đi làm" và "Chấm công vào". Vui lòng đợi thêm {seconds} giây.',
+    work_at_least_2_hours: "Bạn nên làm việc ít nhất 2 giờ trước khi chấm công ra. Vui lòng đợi thêm {minutes} phút.",
 
     // Settings Screen
     work_shifts: "Ca làm việc",
-    manage_work_shifts: "Quản lý ca làm việc",
+    manage_work_shifts: "Quản lý ca làm việc của bạn",
     add_work_shift: "Thêm ca làm việc",
     general_settings: "Cài đặt chung",
     dark_mode: "Chế độ tối",
-    dark_mode_description:
-      "Bật chế độ tối để có trải nghiệm xem tốt hơn trong điều kiện ánh sáng yếu",
+    dark_mode_description: "Bật chế độ tối để xem tốt hơn trong điều kiện ánh sáng yếu",
     language: "Ngôn ngữ",
     notification_sound: "Âm thanh thông báo",
-    play_sound_on_notification: "Phát âm thanh khi có thông báo",
+    play_sound_on_notification: "Phát âm thanh khi thông báo xuất hiện",
     notification_vibration: "Rung thông báo",
-    vibrate_on_notification: "Rung khi có thông báo",
-    multi_button_mode: "Nút đa chức năng",
-    multi_button_mode_description:
-      'Hiển thị đầy đủ các chức năng thay vì chỉ "Đi làm"',
+    vibrate_on_notification: "Rung khi thông báo xuất hiện",
+    multi_button_mode: "Chế độ nhiều nút",
+    multi_button_mode_description: 'Hiển thị tất cả các chức năng check-in/out thay vì chỉ "Đi làm"',
     currently_applied: "Đang áp dụng cho tuần này",
-    about: "Giới thiệu",
+    about: "Thông tin",
     app_description:
-      "Attendo11 giúp bạn theo dõi thời gian làm việc, quản lý ca làm việc và sắp xếp lịch trình công việc.",
+      "Attendo11 giúp bạn theo dõi thời gian làm việc, quản lý ca và luôn ngăn nắp với lịch làm việc của mình.",
 
     // Shift Screen
-    add_shift: "Thêm ca làm việc mới",
-    edit_shift: "Chỉnh sửa ca làm việc",
-    shift_name: "Tên ca làm việc",
-    enter_shift_name: "Nhập tên ca làm việc",
+    add_shift: "Thêm ca làm việc",
+    edit_shift: "Sửa ca làm việc",
+    shift_name: "Tên ca",
+    enter_shift_name: "Nhập tên ca",
     departure_time: "Thời gian xuất phát",
-    start_time: "Giờ bắt đầu",
-    office_end_time: "Giờ kết thúc giờ hành chính",
-    end_time: "Giờ kết thúc ca làm việc",
-    remind_before_start: "Nhắc nhở trước giờ vào làm",
-    remind_after_end: "Nhắc nhở sau giờ làm",
+    start_time: "Thời gian bắt đầu",
+    office_end_time: "Thời gian kết thúc giờ hành chính",
+    end_time: "Thời gian kết thúc",
+    remind_before_start: "Nhắc trước giờ bắt đầu",
+    remind_after_end: "Nhắc sau giờ kết thúc",
     minutes: "phút",
-    show_sign_button: "Hiển thị nút Ký công",
-    days_applied: "Chọn ngày áp dụng",
-    name_required: "Tên ca làm việc không được để trống",
-    name_too_long: "Tên ca làm việc không được vượt quá {limit} ký tự",
-    name_special_chars:
-      "Tên ca làm việc chỉ được chứa chữ cái, số, khoảng trắng và dấu gạch dưới",
+    show_sign_button: "Hiển thị nút ký tên",
+    days_applied: "Ngày áp dụng",
+    name_required: "Yêu cầu tên ca",
+    name_too_long: "Tên ca không được vượt quá {limit} ký tự",
+    name_special_chars: "Tên ca không được chứa các ký tự đặc biệt",
     name_duplicate: "Ca làm việc với tên này đã tồn tại",
     save_shift: "Lưu ca làm việc",
-    save_shift_confirmation: "Bạn có chắc muốn lưu ca làm việc này?",
+    save_shift_confirmation: "Bạn có chắc chắn muốn lưu ca làm việc này?",
     update_shift: "Cập nhật ca làm việc",
-    update_shift_confirmation: "Bạn có chắc muốn cập nhật ca làm việc này?",
-    apply_shift_title: "Áp dụng ca làm việc",
+    update_shift_confirmation: "Bạn có chắc chắn muốn cập nhật ca làm việc này?",
+    apply_shift_title: "Áp dụng ca",
     apply_shift_message: 'Áp dụng ca "{name}" cho tuần này?',
-    delete_shift_title: "Xóa ca làm việc",
-    delete_shift_message: "Bạn có chắc muốn xóa ca làm việc này?",
-    current_shift: "Ca làm việc hiện tại",
-    no_shift_selected: "Chưa chọn ca làm việc",
-    shift_saved: "Đã lưu ca làm việc",
+    delete_shift_title: "Xóa ca",
+    delete_shift_message: "Bạn có chắc chắn muốn xóa ca này?",
+    current_shift: "Ca hiện tại",
+    no_shift_selected: "Không có ca nào được chọn",
+    shift_saved: "Đã lưu ca",
     shift_saved_message: "Ca làm việc của bạn đã được lưu thành công.",
-    shift_updated: "Đã cập nhật ca làm việc",
+    shift_updated: "Đã cập nhật ca",
     shift_updated_message: "Ca làm việc của bạn đã được cập nhật thành công.",
-    error_saving_shift: "Đã xảy ra lỗi khi lưu ca làm việc. Vui lòng thử lại.",
-    error_updating_shift:
-      "Đã xảy ra lỗi khi cập nhật ca làm việc. Vui lòng thử lại.",
-    error_deleting_shift:
-      "Đã xảy ra lỗi khi xóa ca làm việc. Vui lòng thử lại.",
-    error_applying_shift:
-      "Đã xảy ra lỗi khi áp dụng ca làm việc. Vui lòng thử lại.",
+    error_saving_shift: "Đã xảy ra lỗi khi lưu ca làm việc của bạn. Vui lòng thử lại.",
+    error_updating_shift: "Đã xảy ra lỗi khi cập nhật ca làm việc của bạn. Vui lòng thử lại.",
+    error_deleting_shift: "Đã xảy ra lỗi khi xóa ca. Vui lòng thử lại.",
+    error_applying_shift: "Đã xảy ra lỗi khi áp dụng ca. Vui lòng thử lại.",
 
     // Note Screen
-    edit_note: "Chỉnh sửa ghi chú",
+    edit_note: "Sửa ghi chú",
     title: "Tiêu đề",
     enter_title: "Nhập tiêu đề",
     content: "Nội dung",
     enter_content: "Nhập nội dung",
     reminder_time: "Thời gian nhắc nhở",
-    days_to_show: "Ngày hiển thị ghi chú",
-    title_required: "Tiêu đề không được để trống",
-    content_required: "Nội dung không được để trống",
+    days_to_show: "Ngày hiển thị",
+    days_to_show_description: "Chọn ngày mà ghi chú này sẽ xuất hiện.",
+    title_required: "Yêu cầu tiêu đề",
+    content_required: "Yêu cầu nội dung",
     title_too_long: "Tiêu đề không được vượt quá {limit} ký tự",
     content_too_long: "Nội dung không được vượt quá {limit} ký tự",
     save_note: "Lưu ghi chú",
-    save_note_confirmation: "Bạn có chắc muốn lưu ghi chú này?",
+    save_note_confirmation: "Bạn có chắc chắn muốn lưu ghi chú này?",
     update_note: "Cập nhật ghi chú",
-    update_note_confirmation: "Bạn có chắc muốn cập nhật ghi chú này?",
+    update_note_confirmation: "Bạn có chắc chắn muốn cập nhật ghi chú này?",
     no_notes: "Chưa có ghi chú nào",
     note_saved: "Đã lưu ghi chú",
     note_saved_message: "Ghi chú của bạn đã được lưu thành công.",
     note_updated: "Đã cập nhật ghi chú",
     note_updated_message: "Ghi chú của bạn đã được cập nhật thành công.",
-    error_saving_note: "Đã xảy ra lỗi khi lưu ghi chú. Vui lòng thử lại.",
-    error_updating_note:
-      "Đã xảy ra lỗi khi cập nhật ghi chú. Vui lòng thử lại.",
+    error_saving_note: "Đã xảy ra lỗi khi lưu ghi chú của bạn. Vui lòng thử lại.",
+    error_updating_note: "Đã xảy ra lỗi khi cập nhật ghi chú của bạn. Vui lòng thử lại.",
     delete_note: "Xóa ghi chú",
-    delete_note_confirmation: 'Bạn có chắc muốn xóa ghi chú "{title}"?',
+    delete_note_confirmation: 'Bạn có chắc chắn muốn xóa "{title}"?',
     error_deleting_note: "Đã xảy ra lỗi khi xóa ghi chú. Vui lòng thử lại.",
+    note_duplicate: "Một ghi chú với tiêu đề và nội dung này đã tồn tại.",
+    link_to_shifts: "Liên kết với ca làm việc (Tùy chọn)",
+    link_to_shifts_description:
+      "Chọn ca làm việc để liên kết ghi chú này. Nếu không chọn, bạn phải chỉ định ngày bên dưới.",
+    no_shifts_available: "Không có ca làm việc nào. Hãy tạo ca trước.",
+    days_required: "Vui lòng chọn ít nhất một ngày",
 
     // Stats Screen
-    monthly_stats: "Thống kê tháng",
+    monthly_stats: "Thống kê hàng tháng",
     date: "Ngày",
     day: "Thứ",
     regular_hours: "Giờ làm việc",
     ot_150: "OT 150%",
     ot_200: "OT 200%",
     ot_300: "OT 300%",
+    monthly_summary: "Tổng kết tháng",
+    total_regular_hours: "Tổng giờ làm việc",
+    total_ot_150: "Tổng OT 150%",
+    total_ot_200: "Tổng OT 200%",
+    total_ot_300: "Tổng OT 300%",
+    grand_total: "Tổng cộng",
 
     // Days
     sunday: "Chủ Nhật",
@@ -374,35 +412,69 @@ const translations = {
     thursday: "Thứ Năm",
     friday: "Thứ Sáu",
     saturday: "Thứ Bảy",
+    sun: "CN",
+    mon: "T2",
+    tue: "T3",
+    wed: "T4",
+    thu: "T5",
+    fri: "T6",
+    sat: "T7",
 
     data_management: "Quản lý dữ liệu",
     data_backup_restore: "Sao lưu & Khôi phục",
     manage_app_data: "Quản lý dữ liệu ứng dụng của bạn",
     backup_and_restore: "Sao lưu & Khôi phục",
     export_and_import: "Xuất & Nhập",
-    last_backup: "Sao lưu gần nhất",
+    last_backup: "Sao lưu cuối cùng",
     create_backup: "Tạo bản sao lưu",
     restore: "Khôi phục",
     export_to_file: "Xuất ra tệp",
     import_from_file: "Nhập từ tệp",
     data_security: "Bảo mật dữ liệu",
     data_security_description:
-      "Dữ liệu của bạn được lưu trữ an toàn trên thiết bị. Sao lưu thường xuyên giúp bảo vệ khỏi mất dữ liệu.",
+      "Dữ liệu của bạn được lưu trữ an toàn trên thiết bị của bạn. Sao lưu thường xuyên giúp bảo vệ chống mất dữ liệu.",
     encryption: "Mã hóa",
     enabled: "Đã bật",
     auto_backup: "Tự động sao lưu",
     daily: "Hàng ngày",
     please_wait: "Vui lòng đợi...",
-    export_import_description:
-      "Xuất dữ liệu của bạn ra tệp hoặc nhập từ tệp đã xuất trước đó.",
+    export_import_description: "Xuất dữ liệu của bạn vào một tệp hoặc nhập từ một tệp đã xuất trước đó.",
+
+    // Validation errors
+    departure_start_time_error: "Thời gian xuất phát phải ít nhất 5 phút trước thời gian bắt đầu",
+    start_office_end_order_error: "Thời gian bắt đầu phải trước thời gian kết thúc giờ hành chính",
+    start_office_end_duration_error: "Thời gian kết thúc giờ hành chính phải ít nhất 2 giờ sau thời gian bắt đầu",
+    office_end_end_order_error: "Thời gian kết thúc phải bằng hoặc sau thời gian kết thúc giờ hành chính",
+    office_end_end_ot_error:
+      "Nếu có làm thêm giờ, thời gian kết thúc phải ít nhất 30 phút sau thời gian kết thúc giờ hành chính",
+    days_applied_error: "Vui lòng chọn ít nhất một ngày",
+
+    // Thông báo lỗi thời gian
+    time_rule_violation_message_check_in:
+      'Bạn nên đợi ít nhất 5 phút giữa "Đi làm" và "Chấm công vào". Vui lòng đợi thêm {seconds} giây.',
+    time_rule_violation_message_check_out:
+      "Bạn nên làm việc ít nhất 2 giờ trước khi chấm công ra. Vui lòng đợi thêm {minutes} phút.",
+
+    // Viết tắt các ngày trong tuần (cho lưới trạng thái tuần)
+    day_short_sun: "CN",
+    day_short_mon: "T2",
+    day_short_tue: "T3",
+    day_short_wed: "T4",
+    day_short_thu: "T5",
+    day_short_fri: "T6",
+    day_short_sat: "T7",
   },
-};
+}
 
-// Get translation
+/**
+ * Retrieves a translation for a given key and language.
+ *
+ * @param {string} key - The key of the translation to retrieve.
+ * @param {string} language - The language code (e.g., 'en', 'vi').
+ * @returns {string} The translated string, or the key if no translation is found.
+ */
 export const getTranslation = (key, language) => {
-  if (!translations[language]) {
-    language = "vi"; // Default to Vietnamese
-  }
+  const lang = translations[language] || translations.en // Default to English
+  return lang[key] || key // Return the key if the translation is missing
+}
 
-  return translations[language][key] || key;
-};

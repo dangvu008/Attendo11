@@ -1,6 +1,6 @@
 "use client"
 
-import { useContext } from "react"
+import { useContext, useState, useEffect } from "react"
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
@@ -15,16 +15,67 @@ import { AppContext } from "../context/AppContext"
  * @param {boolean} darkMode - Whether dark mode is enabled
  */
 export default function NotesList({ darkMode }) {
-  const { notes, deleteNote, t } = useContext(AppContext)
+  const { notes, deleteNote, t, currentShift } = useContext(AppContext)
   const navigation = useNavigation()
+  const [filteredNotes, setFilteredNotes] = useState([])
 
-  // Sort notes by reminder time
-  const sortedNotes = [...notes].sort((a, b) => {
-    return new Date(a.reminderTime) - new Date(b.reminderTime)
-  })
+  // Filter notes based on current shift and day
+  useEffect(() => {
+    if (!notes || notes.length === 0) {
+      setFilteredNotes([])
+      return
+    }
 
-  // Get only the first 3 notes
-  const displayNotes = sortedNotes.slice(0, 3)
+    // Get current day of week in English (Sun, Mon, etc.)
+    const today = new Date()
+    const dayOfWeek = today.toLocaleString("en-US", { weekday: "short" })
+
+    // Filter notes based on:
+    // 1. Notes associated with current shift
+    // 2. Notes not associated with any shift but scheduled for today
+    const filtered = notes.filter((note) => {
+      // Condition 1: Note is associated with current shift
+      if (note.associatedShiftIds && note.associatedShiftIds.length > 0) {
+        return currentShift && note.associatedShiftIds.includes(currentShift.id)
+      }
+
+      // Condition 2: Note is not associated with any shift but scheduled for today
+      return (
+        (!note.associatedShiftIds || note.associatedShiftIds.length === 0) &&
+        note.explicitReminderDays &&
+        note.explicitReminderDays.includes(dayOfWeek)
+      )
+    })
+
+    // Calculate next reminder time for each note for sorting
+    const notesWithNextReminder = filtered.map((note) => {
+      const reminderDate = new Date(note.reminderTime)
+      const hours = reminderDate.getHours()
+      const minutes = reminderDate.getMinutes()
+
+      // Create a Date object for the next reminder
+      const nextReminder = new Date()
+      nextReminder.setHours(hours, minutes, 0, 0)
+
+      // If the time has already passed today, set it for tomorrow
+      if (nextReminder < new Date()) {
+        nextReminder.setDate(nextReminder.getDate() + 1)
+      }
+
+      return {
+        ...note,
+        nextReminderTime: nextReminder,
+      }
+    })
+
+    // Sort notes by next reminder time
+    const sorted = [...notesWithNextReminder].sort(
+      (a, b) => a.nextReminderTime.getTime() - b.nextReminderTime.getTime(),
+    )
+
+    // Get only the first 3 notes
+    setFilteredNotes(sorted.slice(0, 3))
+  }, [notes, currentShift])
 
   // Format time
   const formatTime = (timeString) => {
@@ -77,7 +128,7 @@ export default function NotesList({ darkMode }) {
     )
   }
 
-  if (displayNotes.length === 0) {
+  if (filteredNotes.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={[styles.emptyText, { color: darkMode ? "#bbb" : "#777" }]}>{t("no_notes")}</Text>
@@ -87,15 +138,25 @@ export default function NotesList({ darkMode }) {
 
   return (
     <View style={styles.container}>
-      {displayNotes.map((note) => (
+      {filteredNotes.map((note) => (
         <View key={note.id} style={[styles.noteCard, { backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0" }]}>
           <View style={styles.noteHeader}>
-            <Text style={[styles.noteTitle, { color: darkMode ? "#fff" : "#000" }]}>{note.title}</Text>
+            <Text
+              style={[styles.noteTitle, { color: darkMode ? "#fff" : "#000" }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {note.title}
+            </Text>
             <Text style={[styles.noteTime, { color: darkMode ? "#bbb" : "#777" }]}>
               {formatTime(note.reminderTime)}
             </Text>
           </View>
-          <Text style={[styles.noteContent, { color: darkMode ? "#bbb" : "#555" }]} numberOfLines={2}>
+          <Text
+            style={[styles.noteContent, { color: darkMode ? "#bbb" : "#555" }]}
+            numberOfLines={3}
+            ellipsizeMode="tail"
+          >
             {note.content}
           </Text>
           <View style={styles.noteActions}>

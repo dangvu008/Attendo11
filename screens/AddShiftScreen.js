@@ -1,23 +1,20 @@
-"use client";
+"use client"
 
-import { useState, useContext, useEffect, Platform } from "react";
+import { useState, useContext, useEffect } from "react"
+import { AppContext } from "../context/AppContext"
 import {
+  Alert,
+  SafeAreaView,
   View,
   Text,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
-  Alert,
   ScrollView,
   Switch,
-  ToastAndroid,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { AppContext } from "../context/AppContext";
-import { generateId } from "../utils/idGenerator";
-import { formatTime } from "../utils/dateUtils";
+  StyleSheet,
+} from "react-native"
+import { Ionicons } from "@expo/vector-icons"
+import DateTimePicker from "@react-native-community/datetimepicker"
 
 /**
  * AddShiftScreen Component
@@ -30,170 +27,237 @@ import { formatTime } from "../utils/dateUtils";
  */
 export default function AddShiftScreen({ navigation, route }) {
   // Get context values and check if we're editing an existing shift
-  const { darkMode, shifts, addShift, updateShift, t } = useContext(AppContext);
-  const editingShift = route.params?.shift;
-  const isEditing = !!editingShift;
+  const { darkMode, shifts, addShift, updateShift, t } = useContext(AppContext)
+  const editingShift = route.params?.shift
+  const isEditing = !!editingShift
+
+  const NAME_LIMIT = 50
 
   // Form state
-  const [name, setName] = useState(editingShift?.name || "");
+  const [name, setName] = useState(editingShift?.name || "")
   const [departureTime, setDepartureTime] = useState(
-    editingShift?.departureTime
-      ? new Date(`2000-01-01T${editingShift.departureTime}`)
-      : new Date()
-  );
+    editingShift?.departureTime ? new Date(`2000-01-01T${editingShift.departureTime}`) : new Date(),
+  )
   const [startTime, setStartTime] = useState(
-    editingShift?.startTime
-      ? new Date(`2000-01-01T${editingShift.startTime}`)
-      : new Date()
-  );
+    editingShift?.startTime ? new Date(`2000-01-01T${editingShift.startTime}`) : new Date(),
+  )
   const [officeEndTime, setOfficeEndTime] = useState(
-    editingShift?.officeEndTime
-      ? new Date(`2000-01-01T${editingShift.officeEndTime}`)
-      : new Date()
-  );
+    editingShift?.officeEndTime ? new Date(`2000-01-01T${editingShift.officeEndTime}`) : new Date(),
+  )
   const [endTime, setEndTime] = useState(
-    editingShift?.endTime
-      ? new Date(`2000-01-01T${editingShift.endTime}`)
-      : new Date()
-  );
-  const [remindBeforeStart, setRemindBeforeStart] = useState(
-    editingShift?.remindBeforeStart || 15
-  );
-  const [remindAfterEnd, setRemindAfterEnd] = useState(
-    editingShift?.remindAfterEnd || 15
-  );
-  const [showSignButton, setShowSignButton] = useState(
-    editingShift?.showSignButton ?? true
-  );
+    editingShift?.endTime ? new Date(`2000-01-01T${editingShift.endTime}`) : new Date(),
+  )
   const [daysApplied, setDaysApplied] = useState(
-    editingShift?.daysApplied || [false, true, true, true, true, true, false]
-  ); // [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    editingShift?.daysApplied || [false, false, false, false, false, false, false],
+  )
 
-  const [activeTimePicker, setActiveTimePicker] = useState(null);
+  // New states to handle additional shift properties
+  const [remindBeforeStart, setRemindBeforeStart] = useState(editingShift?.remindBeforeStart || false)
+  const [remindAfterEnd, setRemindAfterEnd] = useState(editingShift?.remindAfterEnd || false)
+  const [showSignButton, setShowSignButton] = useState(editingShift?.showSignButton || false)
 
-  // Character limit
-  const NAME_LIMIT = 200;
+  // Function to generate a unique ID
+  const generateId = () => {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  }
 
-  // Reminder options
-  const reminderOptions = [5, 10, 15, 30];
+  // Thêm các hàm validation sau vào đầu component AddShiftScreen, sau các khai báo useState
 
-  // Track unsaved changes
-  useEffect(() => {
-    // Only set unsaved changes if form has been modified
-    if (
-      name !== (editingShift?.name || "") ||
-      departureTime.toTimeString() !==
-        (editingShift?.departureTime
-          ? new Date(`2000-01-01T${editingShift.departureTime}`).toTimeString()
-          : new Date().toTimeString()) ||
-      startTime.toTimeString() !==
-        (editingShift?.startTime
-          ? new Date(`2000-01-01T${editingShift.startTime}`).toTimeString()
-          : new Date().toTimeString()) ||
-      officeEndTime.toTimeString() !==
-        (editingShift?.officeEndTime
-          ? new Date(`2000-01-01T${editingShift.officeEndTime}`).toTimeString()
-          : new Date().toTimeString()) ||
-      endTime.toTimeString() !==
-        (editingShift?.endTime
-          ? new Date(`2000-01-01T${editingShift.endTime}`).toTimeString()
-          : new Date().toTimeString()) ||
-      remindBeforeStart !== (editingShift?.remindBeforeStart || 15) ||
-      remindAfterEnd !== (editingShift?.remindAfterEnd || 15) ||
-      showSignButton !== (editingShift?.showSignButton ?? true) ||
-      JSON.stringify(daysApplied) !==
-        JSON.stringify(
-          editingShift?.daysApplied || [
-            false,
-            true,
-            true,
-            true,
-            true,
-            true,
-            false,
-          ]
-        )
-    ) {
-      setHasUnsavedChanges(true);
+  // Validate tên ca làm việc
+  const validateShiftName = () => {
+    // Kiểm tra trường trống
+    if (!name.trim()) {
+      return { isValid: false, error: t("name_required") || "Tên ca không được để trống" }
     }
+
+    // Kiểm tra độ dài
+    if (name.length > NAME_LIMIT) {
+      return {
+        isValid: false,
+        error: t("name_too_long", { limit: NAME_LIMIT }) || `Tên ca không được vượt quá ${NAME_LIMIT} ký tự`,
+      }
+    }
+
+    // Kiểm tra ký tự đặc biệt không được phép
+    // Cho phép chữ cái (bao gồm Unicode cho tiếng Việt và các ngôn ngữ khác), chữ số, khoảng trắng
+    // Không cho phép các ký tự đặc biệt như !@#$%^&*()=+[]{}\|;:'",.<>/?~
+    const invalidCharsRegex = /[!@#$%^&*()=+[\]{}\\|;:'",.<>/?~]/
+    if (invalidCharsRegex.test(name)) {
+      return {
+        isValid: false,
+        error: t("name_special_chars") || "Tên ca không hợp lệ (chứa ký tự đặc biệt không được phép)",
+      }
+    }
+
+    // Kiểm tra trùng tên (không phân biệt hoa thường)
+    const duplicateName = shifts.find(
+      (shift) => shift.name.toLowerCase() === name.trim().toLowerCase() && (!isEditing || shift.id !== editingShift.id),
+    )
+    if (duplicateName) {
+      return { isValid: false, error: t("name_duplicate") || "Tên ca đã tồn tại" }
+    }
+
+    return { isValid: true, error: null }
+  }
+
+  // Validate thời gian xuất phát và bắt đầu
+  const validateDepartureAndStartTime = () => {
+    // Chuyển đổi thời gian thành phút trong ngày để dễ so sánh
+    const departureMinutes = departureTime.getHours() * 60 + departureTime.getMinutes()
+    const startMinutes = startTime.getHours() * 60 + startTime.getMinutes()
+
+    // Tính khoảng cách, xử lý ca qua đêm
+    let timeDiff = startMinutes - departureMinutes
+    if (timeDiff < 0) {
+      // Nếu startTime có vẻ sớm hơn departureTime, giả định startTime là ngày hôm sau
+      timeDiff += 24 * 60 // Thêm 24 giờ (tính bằng phút)
+    }
+
+    // Kiểm tra khoảng cách tối thiểu 5 phút
+    if (timeDiff < 5) {
+      return {
+        isValid: false,
+        error: t("departure_start_time_error") || "Giờ xuất phát phải trước giờ bắt đầu tối thiểu 5 phút",
+      }
+    }
+
+    return { isValid: true, error: null }
+  }
+
+  // Validate thời gian bắt đầu và kết thúc hành chính
+  const validateStartAndOfficeEndTime = () => {
+    // Chuyển đổi thời gian thành phút trong ngày
+    const startMinutes = startTime.getHours() * 60 + startTime.getMinutes()
+    const officeEndMinutes = officeEndTime.getHours() * 60 + officeEndTime.getMinutes()
+
+    // Tính khoảng cách, xử lý ca qua đêm
+    let timeDiff = officeEndMinutes - startMinutes
+    if (timeDiff < 0) {
+      // Nếu officeEndTime có vẻ sớm hơn startTime, giả định officeEndTime là ngày hôm sau
+      timeDiff += 24 * 60 // Thêm 24 giờ (tính bằng phút)
+    }
+
+    // Kiểm tra thứ tự thời gian
+    if (timeDiff <= 0) {
+      return {
+        isValid: false,
+        error: t("start_office_end_order_error") || "Giờ bắt đầu phải trước giờ kết thúc HC",
+      }
+    }
+
+    // Kiểm tra khoảng cách tối thiểu 2 giờ (120 phút)
+    if (timeDiff < 120) {
+      return {
+        isValid: false,
+        error: t("start_office_end_duration_error") || "Giờ kết thúc HC phải sau giờ bắt đầu tối thiểu 2 giờ",
+      }
+    }
+
+    return { isValid: true, error: null }
+  }
+
+  // Validate thời gian kết thúc hành chính và kết thúc ca
+  const validateOfficeEndAndEndTime = () => {
+    // Chuyển đổi thời gian thành phút trong ngày
+    const officeEndMinutes = officeEndTime.getHours() * 60 + officeEndTime.getMinutes()
+    const endMinutes = endTime.getHours() * 60 + endTime.getMinutes()
+
+    // Tính khoảng cách, xử lý ca qua đêm
+    let timeDiff = endMinutes - officeEndMinutes
+    if (timeDiff < 0) {
+      // Nếu endTime có vẻ sớm hơn officeEndTime, giả định endTime là ngày hôm sau
+      timeDiff += 24 * 60 // Thêm 24 giờ (tính bằng phút)
+    }
+
+    // Kiểm tra thứ tự thời gian (endTime phải bằng hoặc sau officeEndTime)
+    if (timeDiff < 0) {
+      return {
+        isValid: false,
+        error: t("office_end_end_order_error") || "Giờ kết thúc ca phải sau hoặc bằng giờ kết thúc HC",
+      }
+    }
+
+    // Nếu endTime khác officeEndTime, kiểm tra khoảng cách tối thiểu 30 phút cho OT
+    if (timeDiff > 0 && timeDiff < 30) {
+      return {
+        isValid: false,
+        error: t("office_end_end_ot_error") || "Nếu có OT, giờ kết thúc ca phải sau giờ kết thúc HC tối thiểu 30 phút",
+      }
+    }
+
+    return { isValid: true, error: null }
+  }
+
+  // Validate ngày áp dụng
+  const validateDaysApplied = () => {
+    // Kiểm tra có ít nhất 1 ngày được chọn
+    const hasSelectedDay = daysApplied.some((day) => day === true)
+
+    if (!hasSelectedDay) {
+      return { isValid: false, error: t("days_applied_error") || "Chọn ít nhất một ngày áp dụng" }
+    }
+
+    return { isValid: true, error: null }
+  }
+
+  // Thêm state để lưu trữ lỗi validation
+  const [validationErrors, setValidationErrors] = useState({
+    name: null,
+    departureStartTime: null,
+    startOfficeEndTime: null,
+    officeEndEndTime: null,
+    daysApplied: null,
+  })
+
+  // Thêm state để kiểm tra form có hợp lệ không
+  const [isFormValid, setIsFormValid] = useState(false)
+
+  // Thêm useEffect để validate form khi các giá trị thay đổi
+  useEffect(() => {
+    // Validate tất cả các trường
+    const nameValidation = validateShiftName()
+    const departureStartValidation = validateDepartureAndStartTime()
+    const startOfficeEndValidation = validateStartAndOfficeEndTime()
+    const officeEndEndValidation = validateOfficeEndAndEndTime()
+    const daysAppliedValidation = validateDaysApplied()
+
+    // Cập nhật state lỗi validation
+    setValidationErrors({
+      name: nameValidation.isValid ? null : nameValidation.error,
+      departureStartTime: departureStartValidation.isValid ? null : departureStartValidation.error,
+      startOfficeEndTime: startOfficeEndValidation.isValid ? null : startOfficeEndValidation.error,
+      officeEndEndTime: officeEndEndValidation.isValid ? null : officeEndEndValidation.error,
+      daysApplied: daysAppliedValidation.isValid ? null : daysAppliedValidation.error,
+    })
+
+    // Kiểm tra form có hợp lệ không
+    setIsFormValid(
+      nameValidation.isValid &&
+        departureStartValidation.isValid &&
+        startOfficeEndValidation.isValid &&
+        officeEndEndValidation.isValid &&
+        daysAppliedValidation.isValid,
+    )
   }, [
     name,
     departureTime,
     startTime,
     officeEndTime,
     endTime,
-    remindBeforeStart,
-    remindAfterEnd,
-    showSignButton,
     daysApplied,
-    editingShift?.name,
-    editingShift?.departureTime,
-    editingShift?.startTime,
-    editingShift?.officeEndTime,
-    editingShift?.endTime,
-    editingShift?.remindBeforeStart,
-    editingShift?.remindAfterEnd,
-    editingShift?.showSignButton,
-    editingShift?.daysApplied,
-  ]);
+    shifts,
+    isEditing,
+    editingShift,
+    shifts,
+    isEditing,
+    editingShift,
+  ])
 
-  // Handle time change
-  const onTimeChange = (event, selectedTime) => {
-    setActiveTimePicker(null);
-    if (selectedTime) {
-      switch (activeTimePicker) {
-        case "departure":
-          setDepartureTime(selectedTime);
-          break;
-        case "start":
-          setStartTime(selectedTime);
-          break;
-        case "officeEnd":
-          setOfficeEndTime(selectedTime);
-          break;
-        case "end":
-          setEndTime(selectedTime);
-          break;
-      }
-    }
-  };
-
-  // Toggle day selection
-  const toggleDay = (index) => {
-    const newDaysApplied = [...daysApplied];
-    newDaysApplied[index] = !newDaysApplied[index];
-    setDaysApplied(newDaysApplied);
-  };
-
-  // Save shift
+  // Cập nhật hàm saveShift để kiểm tra validation trước khi lưu
   const saveShift = async () => {
-    // Validate inputs
-    if (!name.trim()) {
-      Alert.alert(t("error"), t("name_required"));
-      return;
-    }
-
-    if (name.length > NAME_LIMIT) {
-      Alert.alert(t("error"), t("name_too_long", { limit: NAME_LIMIT }));
-      return;
-    }
-
-    // Check for special characters that aren't allowed in names
-    // Allowing alphanumeric, spaces, and Vietnamese characters
-    if (/[^a-zA-Z0-9\s\u00C0-\u1EF9_]/.test(name)) {
-      Alert.alert(t("error"), t("name_special_chars"));
-      return;
-    }
-
-    // Check for duplicate name
-    const duplicateName = shifts.find(
-      (shift) =>
-        shift.name === name && (!isEditing || shift.id !== editingShift.id)
-    );
-    if (duplicateName) {
-      Alert.alert(t("error"), t("name_duplicate"));
-      return;
+    // Kiểm tra form có hợp lệ không
+    if (!isFormValid) {
+      return
     }
 
     try {
@@ -203,8 +267,8 @@ export default function AddShiftScreen({ navigation, route }) {
           hour: "2-digit",
           minute: "2-digit",
           hour12: false,
-        });
-      };
+        })
+      }
 
       // Create new shift object
       const newShift = {
@@ -220,164 +284,124 @@ export default function AddShiftScreen({ navigation, route }) {
         daysApplied,
         createdAt: editingShift?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      };
+      }
 
       // Update shifts array
-      let success = false;
+      let success = false
       if (isEditing) {
-        success = await updateShift(newShift);
+        success = await updateShift(newShift)
       } else {
-        const result = await addShift(newShift);
-        success = !!result;
+        const result = await addShift(newShift)
+        success = !!result
       }
 
       if (success) {
         // Show success message
         Alert.alert(
+          isEditing ? t("shift_updated") || "Shift Updated" : t("shift_saved") || "Shift Saved",
           isEditing
-            ? t("shift_updated") || "Shift Updated"
-            : t("shift_saved") || "Shift Saved",
-          isEditing
-            ? t("shift_updated_message") ||
-                "Your work shift has been updated successfully."
-            : t("shift_saved_message") ||
-                "Your work shift has been saved successfully.",
-          [{ text: t("ok") || "OK", onPress: () => navigation.goBack() }]
-        );
+            ? t("shift_updated_message") || "Your work shift has been updated successfully."
+            : t("shift_saved_message") || "Your work shift has been saved successfully.",
+          [{ text: t("ok") || "OK", onPress: () => navigation.goBack() }],
+        )
       } else {
         // Show error message
         Alert.alert(
           t("error") || "Error",
           isEditing
-            ? t("error_updating_shift") ||
-                "There was an error updating your work shift. Please try again."
-            : t("error_saving_shift") ||
-                "There was an error saving your work shift. Please try again."
-        );
+            ? t("error_updating_shift") || "There was an error updating your work shift. Please try again."
+            : t("error_saving_shift") || "There was an error saving your work shift. Please try again.",
+        )
       }
     } catch (error) {
-      console.error("Error saving shift:", error);
-      Alert.alert(
-        t("error") || "Error",
-        t("unexpected_error") ||
-          "An unexpected error occurred. Please try again."
-      );
+      console.error("Error saving shift:", error)
+      Alert.alert(t("error") || "Error", t("unexpected_error") || "An unexpected error occurred. Please try again.")
     }
-  };
+  }
 
-  // Confirm save
+  const formatTime = (date) => {
+    return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+  }
+
+  const [activeTimePicker, setActiveTimePicker] = useState(null)
+
+  const onTimeChange = (event, selectedDate) => {
+    const currentDate =
+      selectedDate ||
+      (activeTimePicker === "departure"
+        ? departureTime
+        : activeTimePicker === "start"
+          ? startTime
+          : activeTimePicker === "officeEnd"
+            ? officeEndTime
+            : endTime)
+    setActiveTimePicker(null)
+    if (activeTimePicker === "departure") {
+      setDepartureTime(currentDate)
+    } else if (activeTimePicker === "start") {
+      setStartTime(currentDate)
+    } else if (activeTimePicker === "officeEnd") {
+      setOfficeEndTime(currentDate)
+    } else {
+      setEndTime(currentDate)
+    }
+  }
+
+  const reminderOptions = [5, 10, 15, 30]
+
+  const dayNames = [t("sun"), t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat")]
+
+  const toggleDay = (index) => {
+    const newDaysApplied = [...daysApplied]
+    newDaysApplied[index] = !newDaysApplied[index]
+    setDaysApplied(newDaysApplied)
+  }
+
+  const confirmReset = () => {
+    Alert.alert(
+      t("confirm_reset") || "Reset Form",
+      t("reset_message") || "Are you sure you want to reset all fields?",
+      [
+        { text: t("cancel") || "Cancel", style: "cancel" },
+        { text: t("reset") || "Reset", onPress: resetForm },
+      ],
+    )
+  }
+
+  const resetForm = () => {
+    setName("")
+    setDepartureTime(new Date())
+    setStartTime(new Date())
+    setOfficeEndTime(new Date())
+    setEndTime(new Date())
+    setRemindBeforeStart(false)
+    setRemindAfterEnd(false)
+    setShowSignButton(false)
+    setDaysApplied([false, false, false, false, false, false, false])
+  }
+
   const confirmSave = () => {
     Alert.alert(
-      isEditing ? t("update_shift") : t("save_shift"),
-      isEditing ? t("update_shift_confirmation") : t("save_shift_confirmation"),
+      isEditing ? t("confirm_update") || "Update Shift" : t("confirm_save") || "Save Shift",
+      isEditing
+        ? t("update_message") || "Are you sure you want to update this shift?"
+        : t("save_message") || "Are you sure you want to save this shift?",
       [
-        {
-          text: t("cancel"),
-          style: "cancel",
-        },
-        {
-          text: isEditing ? t("update") : t("save"),
-          onPress: saveShift,
-        },
-      ]
-    );
-  };
+        { text: t("cancel") || "Cancel", style: "cancel" },
+        { text: isEditing ? t("update") || "Update" : t("save") || "Save", onPress: saveShift },
+      ],
+    )
+  }
 
-  // Reset form to initial values
-  const resetForm = () => {
-    if (isEditing) {
-      setName(editingShift.name);
-      setDepartureTime(new Date(`2000-01-01T${editingShift.departureTime}`));
-      setStartTime(new Date(`2000-01-01T${editingShift.startTime}`));
-      setOfficeEndTime(new Date(`2000-01-01T${editingShift.officeEndTime}`));
-      setEndTime(new Date(`2000-01-01T${editingShift.endTime}`));
-      setRemindBeforeStart(editingShift.remindBeforeStart);
-      setRemindAfterEnd(editingShift.remindAfterEnd);
-      setShowSignButton(editingShift.showSignButton);
-      setDaysApplied(editingShift.daysApplied);
-    } else {
-      setName("");
-      setDepartureTime(new Date());
-      setStartTime(new Date());
-      setOfficeEndTime(new Date());
-      setEndTime(new Date());
-      setRemindBeforeStart(15);
-      setRemindAfterEnd(15);
-      setShowSignButton(true);
-      setDaysApplied([false, true, true, true, true, true, false]);
-    }
-    setHasUnsavedChanges(false);
-
-    // Show toast notification
-    if (Platform && Platform.OS === "android") {
-      ToastAndroid.show(t("form_reset") || "Form reset", ToastAndroid.SHORT);
-    }
-  };
-
-  // Confirm reset
-  const confirmReset = () => {
-    if (!hasUnsavedChanges) {
-      resetForm();
-      return;
-    }
-
-    Alert.alert(
-      t("reset_form") || "Reset Form",
-      t("reset_form_confirmation") ||
-        "Are you sure you want to reset the form? All unsaved changes will be lost.",
-      [
-        {
-          text: t("cancel") || "Cancel",
-          style: "cancel",
-        },
-        {
-          text: t("reset") || "Reset",
-          onPress: resetForm,
-          style: "destructive",
-        },
-      ]
-    );
-  };
-
-  // Confirm navigation back if there are unsaved changes
   const handleBackPress = () => {
-    if (!hasUnsavedChanges) {
-      navigation.goBack();
-      return;
-    }
+    navigation.goBack()
+  }
 
-    Alert.alert(
-      t("unsaved_changes") || "Unsaved Changes",
-      t("unsaved_changes_message") ||
-        "You have unsaved changes. Are you sure you want to go back?",
-      [
-        {
-          text: t("cancel") || "Cancel",
-          style: "cancel",
-        },
-        {
-          text: t("discard") || "Discard",
-          onPress: () => navigation.goBack(),
-          style: "destructive",
-        },
-      ]
-    );
-  };
-
-  // Day names
-  const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-
+  // Cập nhật phần render để hiển thị lỗi validation
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        { backgroundColor: darkMode ? "#121212" : "#f5f5f5" },
-      ]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? "#121212" : "#f5f5f5" }]}>
       <View style={styles.header}>
-        <Text
-          style={[styles.screenTitle, { color: darkMode ? "#fff" : "#000" }]}
-        >
+        <Text style={[styles.screenTitle, { color: darkMode ? "#fff" : "#000" }]}>
           {isEditing ? t("edit_shift") : t("add_shift")}
         </Text>
         <TouchableOpacity style={styles.closeButton} onPress={handleBackPress}>
@@ -388,17 +412,16 @@ export default function AddShiftScreen({ navigation, route }) {
       <ScrollView style={styles.scrollView}>
         <View style={styles.formContainer}>
           <View style={styles.inputGroup}>
-            <Text
-              style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}
-            >
-              {t("shift_name")}
-            </Text>
+            <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("shift_name")}</Text>
             <TextInput
               style={[
                 styles.input,
+                validationErrors.name && styles.inputError,
                 {
                   color: darkMode ? "#fff" : "#000",
                   backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0",
+                  borderColor: validationErrors.name ? "#ff6b6b" : "transparent",
+                  borderWidth: validationErrors.name ? 1 : 0,
                 },
               ]}
               value={name}
@@ -407,137 +430,108 @@ export default function AddShiftScreen({ navigation, route }) {
               placeholderTextColor={darkMode ? "#999" : "#777"}
               maxLength={NAME_LIMIT}
             />
-            <Text
-              style={[
-                styles.charCounter,
-                { color: darkMode ? "#bbb" : "#777" },
-              ]}
-            >
-              {name.length}/{NAME_LIMIT}
-            </Text>
+            <View style={styles.inputFooter}>
+              <Text style={[styles.charCounter, { color: darkMode ? "#bbb" : "#777" }]}>
+                {name.length}/{NAME_LIMIT}
+              </Text>
+              {validationErrors.name && <Text style={styles.errorText}>{validationErrors.name}</Text>}
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text
-              style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}
-            >
-              {t("departure_time")}
-            </Text>
+            <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("departure_time")}</Text>
             <TouchableOpacity
               style={[
                 styles.timePickerButton,
+                validationErrors.departureStartTime && styles.inputError,
                 {
                   backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0",
+                  borderColor: validationErrors.departureStartTime ? "#ff6b6b" : "transparent",
+                  borderWidth: validationErrors.departureStartTime ? 1 : 0,
                 },
               ]}
               onPress={() => setActiveTimePicker("departure")}
             >
-              <Text
-                style={[
-                  styles.timePickerText,
-                  { color: darkMode ? "#fff" : "#000" },
-                ]}
-              >
+              <Text style={[styles.timePickerText, { color: darkMode ? "#fff" : "#000" }]}>
                 {formatTime(departureTime)}
               </Text>
-              <Ionicons
-                name="time-outline"
-                size={20}
-                color={darkMode ? "#6a5acd" : "#6a5acd"}
-              />
+              <Ionicons name="time-outline" size={20} color={darkMode ? "#6a5acd" : "#6a5acd"} />
             </TouchableOpacity>
+            {validationErrors.departureStartTime && (
+              <Text style={styles.errorText}>{validationErrors.departureStartTime}</Text>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
-            <Text
-              style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}
-            >
-              {t("start_time")}
-            </Text>
+            <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("start_time")}</Text>
             <TouchableOpacity
               style={[
                 styles.timePickerButton,
+                (validationErrors.departureStartTime || validationErrors.startOfficeEndTime) && styles.inputError,
                 {
                   backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0",
+                  borderColor:
+                    validationErrors.departureStartTime || validationErrors.startOfficeEndTime
+                      ? "#ff6b6b"
+                      : "transparent",
+                  borderWidth: validationErrors.departureStartTime || validationErrors.startOfficeEndTime ? 1 : 0,
                 },
               ]}
               onPress={() => setActiveTimePicker("start")}
             >
-              <Text
-                style={[
-                  styles.timePickerText,
-                  { color: darkMode ? "#fff" : "#000" },
-                ]}
-              >
+              <Text style={[styles.timePickerText, { color: darkMode ? "#fff" : "#000" }]}>
                 {formatTime(startTime)}
               </Text>
-              <Ionicons
-                name="time-outline"
-                size={20}
-                color={darkMode ? "#6a5acd" : "#6a5acd"}
-              />
+              <Ionicons name="time-outline" size={20} color={darkMode ? "#6a5acd" : "#6a5acd"} />
             </TouchableOpacity>
+            {validationErrors.startOfficeEndTime && !validationErrors.departureStartTime && (
+              <Text style={styles.errorText}>{validationErrors.startOfficeEndTime}</Text>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
-            <Text
-              style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}
-            >
-              {t("office_end_time")}
-            </Text>
+            <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("office_end_time")}</Text>
             <TouchableOpacity
               style={[
                 styles.timePickerButton,
+                (validationErrors.startOfficeEndTime || validationErrors.officeEndEndTime) && styles.inputError,
                 {
                   backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0",
+                  borderColor:
+                    validationErrors.startOfficeEndTime || validationErrors.officeEndEndTime
+                      ? "#ff6b6b"
+                      : "transparent",
+                  borderWidth: validationErrors.startOfficeEndTime || validationErrors.officeEndEndTime ? 1 : 0,
                 },
               ]}
               onPress={() => setActiveTimePicker("officeEnd")}
             >
-              <Text
-                style={[
-                  styles.timePickerText,
-                  { color: darkMode ? "#fff" : "#000" },
-                ]}
-              >
+              <Text style={[styles.timePickerText, { color: darkMode ? "#fff" : "#000" }]}>
                 {formatTime(officeEndTime)}
               </Text>
-              <Ionicons
-                name="time-outline"
-                size={20}
-                color={darkMode ? "#6a5acd" : "#6a5acd"}
-              />
+              <Ionicons name="time-outline" size={20} color={darkMode ? "#6a5acd" : "#6a5acd"} />
             </TouchableOpacity>
+            {validationErrors.officeEndEndTime && !validationErrors.startOfficeEndTime && (
+              <Text style={styles.errorText}>{validationErrors.officeEndEndTime}</Text>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
-            <Text
-              style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}
-            >
-              {t("end_time")}
-            </Text>
+            <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("end_time")}</Text>
             <TouchableOpacity
               style={[
                 styles.timePickerButton,
+                validationErrors.officeEndEndTime && styles.inputError,
                 {
                   backgroundColor: darkMode ? "#2d2d2d" : "#f0f0f0",
+                  borderColor: validationErrors.officeEndEndTime ? "#ff6b6b" : "transparent",
+                  borderWidth: validationErrors.officeEndEndTime ? 1 : 0,
                 },
               ]}
               onPress={() => setActiveTimePicker("end")}
             >
-              <Text
-                style={[
-                  styles.timePickerText,
-                  { color: darkMode ? "#fff" : "#000" },
-                ]}
-              >
-                {formatTime(endTime)}
-              </Text>
-              <Ionicons
-                name="time-outline"
-                size={20}
-                color={darkMode ? "#6a5acd" : "#6a5acd"}
-              />
+              <Text style={[styles.timePickerText, { color: darkMode ? "#fff" : "#000" }]}>{formatTime(endTime)}</Text>
+              <Ionicons name="time-outline" size={20} color={darkMode ? "#6a5acd" : "#6a5acd"} />
             </TouchableOpacity>
           </View>
 
@@ -547,10 +541,10 @@ export default function AddShiftScreen({ navigation, route }) {
                 activeTimePicker === "departure"
                   ? departureTime
                   : activeTimePicker === "start"
-                  ? startTime
-                  : activeTimePicker === "officeEnd"
-                  ? officeEndTime
-                  : endTime
+                    ? startTime
+                    : activeTimePicker === "officeEnd"
+                      ? officeEndTime
+                      : endTime
               }
               mode="time"
               is24Hour={true}
@@ -560,26 +554,16 @@ export default function AddShiftScreen({ navigation, route }) {
           )}
 
           <View style={styles.inputGroup}>
-            <Text
-              style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}
-            >
-              {t("remind_before_start")}
-            </Text>
+            <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("remind_before_start")}</Text>
             <View style={styles.reminderOptionsContainer}>
               {reminderOptions.map((option) => (
                 <TouchableOpacity
                   key={`before-${option}`}
                   style={[
                     styles.reminderOption,
-                    remindBeforeStart === option &&
-                      styles.selectedReminderOption,
+                    remindBeforeStart === option && styles.selectedReminderOption,
                     {
-                      backgroundColor:
-                        remindBeforeStart === option
-                          ? "#6a5acd"
-                          : darkMode
-                          ? "#2d2d2d"
-                          : "#f0f0f0",
+                      backgroundColor: remindBeforeStart === option ? "#6a5acd" : darkMode ? "#2d2d2d" : "#f0f0f0",
                     },
                   ]}
                   onPress={() => setRemindBeforeStart(option)}
@@ -588,12 +572,7 @@ export default function AddShiftScreen({ navigation, route }) {
                     style={[
                       styles.reminderOptionText,
                       {
-                        color:
-                          remindBeforeStart === option
-                            ? "#fff"
-                            : darkMode
-                            ? "#fff"
-                            : "#000",
+                        color: remindBeforeStart === option ? "#fff" : darkMode ? "#fff" : "#000",
                       },
                     ]}
                   >
@@ -605,11 +584,7 @@ export default function AddShiftScreen({ navigation, route }) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text
-              style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}
-            >
-              {t("remind_after_end")}
-            </Text>
+            <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("remind_after_end")}</Text>
             <View style={styles.reminderOptionsContainer}>
               {reminderOptions.map((option) => (
                 <TouchableOpacity
@@ -618,12 +593,7 @@ export default function AddShiftScreen({ navigation, route }) {
                     styles.reminderOption,
                     remindAfterEnd === option && styles.selectedReminderOption,
                     {
-                      backgroundColor:
-                        remindAfterEnd === option
-                          ? "#6a5acd"
-                          : darkMode
-                          ? "#2d2d2d"
-                          : "#f0f0f0",
+                      backgroundColor: remindAfterEnd === option ? "#6a5acd" : darkMode ? "#2d2d2d" : "#f0f0f0",
                     },
                   ]}
                   onPress={() => setRemindAfterEnd(option)}
@@ -632,12 +602,7 @@ export default function AddShiftScreen({ navigation, route }) {
                     style={[
                       styles.reminderOptionText,
                       {
-                        color:
-                          remindAfterEnd === option
-                            ? "#fff"
-                            : darkMode
-                            ? "#fff"
-                            : "#000",
+                        color: remindAfterEnd === option ? "#fff" : darkMode ? "#fff" : "#000",
                       },
                     ]}
                   >
@@ -650,14 +615,7 @@ export default function AddShiftScreen({ navigation, route }) {
 
           <View style={styles.inputGroup}>
             <View style={styles.switchContainer}>
-              <Text
-                style={[
-                  styles.inputLabel,
-                  { color: darkMode ? "#fff" : "#000" },
-                ]}
-              >
-                {t("show_sign_button")}
-              </Text>
+              <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("show_sign_button")}</Text>
               <Switch
                 value={showSignButton}
                 onValueChange={setShowSignButton}
@@ -668,12 +626,18 @@ export default function AddShiftScreen({ navigation, route }) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text
-              style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}
+            <Text style={[styles.inputLabel, { color: darkMode ? "#fff" : "#000" }]}>{t("days_applied")}</Text>
+            <View
+              style={[
+                styles.daysContainer,
+                validationErrors.daysApplied && {
+                  borderColor: "#ff6b6b",
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  padding: 4,
+                },
+              ]}
             >
-              {t("days_applied")}
-            </Text>
-            <View style={styles.daysContainer}>
               {dayNames.map((day, index) => (
                 <TouchableOpacity
                   key={index}
@@ -681,11 +645,7 @@ export default function AddShiftScreen({ navigation, route }) {
                     styles.dayButton,
                     daysApplied[index] && styles.selectedDayButton,
                     {
-                      backgroundColor: daysApplied[index]
-                        ? "#6a5acd"
-                        : darkMode
-                        ? "#2d2d2d"
-                        : "#f0f0f0",
+                      backgroundColor: daysApplied[index] ? "#6a5acd" : darkMode ? "#2d2d2d" : "#f0f0f0",
                     },
                   ]}
                   onPress={() => toggleDay(index)}
@@ -694,11 +654,7 @@ export default function AddShiftScreen({ navigation, route }) {
                     style={[
                       styles.dayText,
                       {
-                        color: daysApplied[index]
-                          ? "#fff"
-                          : darkMode
-                          ? "#fff"
-                          : "#000",
+                        color: daysApplied[index] ? "#fff" : darkMode ? "#fff" : "#000",
                       },
                     ]}
                   >
@@ -707,6 +663,7 @@ export default function AddShiftScreen({ navigation, route }) {
                 </TouchableOpacity>
               ))}
             </View>
+            {validationErrors.daysApplied && <Text style={styles.errorText}>{validationErrors.daysApplied}</Text>}
           </View>
         </View>
       </ScrollView>
@@ -723,34 +680,30 @@ export default function AddShiftScreen({ navigation, route }) {
           accessibilityLabel={t("reset") || "Reset"}
           accessibilityHint={t("reset_form_hint") || "Reset all form fields"}
         >
-          <Ionicons
-            name="refresh-outline"
-            size={24}
-            color={darkMode ? "#fff" : "#000"}
-          />
+          <Ionicons name="refresh-outline" size={24} color={darkMode ? "#fff" : "#000"} />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.saveButton, { backgroundColor: "#6a5acd" }]}
+          style={[
+            styles.saveButton,
+            {
+              backgroundColor: isFormValid ? "#6a5acd" : "#9d8fe0",
+              opacity: isFormValid ? 1 : 0.7,
+            },
+          ]}
           onPress={confirmSave}
+          disabled={!isFormValid}
           accessibilityLabel={isEditing ? t("update") : t("save")}
-          accessibilityHint={
-            isEditing
-              ? t("update_shift_hint")
-              : t("save_shift_hint") || "Save the shift"
-          }
+          accessibilityHint={isEditing ? t("update_shift_hint") : t("save_shift_hint") || "Save the shift"}
         >
-          <Ionicons
-            name={isEditing ? "checkmark-circle-outline" : "save-outline"}
-            size={24}
-            color="#fff"
-          />
+          <Ionicons name={isEditing ? "checkmark-circle-outline" : "save-outline"} size={24} color="#fff" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
-  );
+  )
 }
 
+// Thêm styles mới cho hiển thị lỗi validation
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -791,8 +744,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
   },
+  inputError: {
+    borderWidth: 1,
+    borderColor: "#ff6b6b",
+  },
+  inputFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
   charCounter: {
-    textAlign: "right",
+    fontSize: 12,
+  },
+  errorText: {
+    color: "#ff6b6b",
     fontSize: 12,
     marginTop: 4,
   },
@@ -870,4 +836,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: 8,
   },
-});
+})
+

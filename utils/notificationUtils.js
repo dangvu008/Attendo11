@@ -1,8 +1,15 @@
 import * as Notifications from "expo-notifications"
 import * as BackgroundFetch from "expo-background-fetch"
 import * as TaskManager from "expo-task-manager"
-import { getActiveShift, getAttendanceLogByType } from "./database"
+import { getActiveShift, getAttendanceLogByType, getNotes, getShiftById } from "./database"
 import { formatDate } from "./dateUtils"
+import {
+  scheduleAlarm,
+  cancelAlarmsByType,
+  cancelAllAlarms,
+  initializeAlarmSystem,
+  triggerAlarmNow,
+} from "./alarmUtils"
 
 // Định nghĩa task name cho background fetch
 const BACKGROUND_NOTIFICATION_TASK = "BACKGROUND_NOTIFICATION_TASK"
@@ -25,6 +32,9 @@ export const configureNotifications = async () => {
         shouldSetBadge: true,
       }),
     })
+
+    // Khởi tạo hệ thống báo thức
+    await initializeAlarmSystem()
 
     // Đăng ký background task
     await registerBackgroundNotificationTask()
@@ -67,13 +77,13 @@ const registerBackgroundNotificationTask = async () => {
   }
 }
 
-// Lên lịch thông báo xuất phát
+// Lên lịch báo thức xuất phát
 export const scheduleDepartureNotification = async (shift) => {
   if (!shift) return null
 
   try {
     // Hủy thông báo xuất phát hiện tại
-    await cancelNotificationsByType("departure")
+    await cancelAlarmsByType("departure")
 
     // Lấy ngày hiện tại
     const today = new Date()
@@ -109,32 +119,30 @@ export const scheduleDepartureNotification = async (shift) => {
       trigger.setDate(trigger.getDate() + 1)
     }
 
-    // Lên lịch thông báo
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Đến giờ đi làm",
-        body: `Đã đến giờ xuất phát đi làm cho ca ${shift.name}`,
-        data: { type: "departure", shiftId: shift.id },
-        sound: true,
-      },
-      trigger,
+    // Lên lịch báo thức thay vì thông báo thông thường
+    const alarmId = await scheduleAlarm({
+      title: "Đến giờ đi làm",
+      body: `Đã đến giờ xuất phát đi làm cho ca ${shift.name}`,
+      triggerTime: trigger,
+      type: "departure",
+      data: { shiftId: shift.id },
     })
 
-    console.log(`Scheduled departure notification for ${trigger.toLocaleString()}, ID: ${notificationId}`)
-    return notificationId
+    console.log(`Scheduled departure alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`)
+    return alarmId
   } catch (error) {
     console.error("Error scheduling departure notification:", error)
     return null
   }
 }
 
-// Lên lịch thông báo chấm công vào
+// Lên lịch báo thức chấm công vào
 export const scheduleCheckInNotification = async (shift) => {
   if (!shift) return null
 
   try {
     // Hủy thông báo chấm công vào hiện tại
-    await cancelNotificationsByType("check-in")
+    await cancelAlarmsByType("check-in")
 
     // Lấy ngày hiện tại
     const today = new Date()
@@ -171,32 +179,30 @@ export const scheduleCheckInNotification = async (shift) => {
       trigger.setDate(trigger.getDate() + 1)
     }
 
-    // Lên lịch thông báo
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Sắp đến giờ chấm công vào",
-        body: `Còn ${shift.remindBeforeStart} phút nữa đến giờ chấm công vào cho ca ${shift.name}`,
-        data: { type: "check-in", shiftId: shift.id },
-        sound: true,
-      },
-      trigger,
+    // Lên lịch báo thức thay vì thông báo thông thường
+    const alarmId = await scheduleAlarm({
+      title: "Sắp đến giờ chấm công vào",
+      body: `Còn ${shift.remindBeforeStart} phút nữa đến giờ chấm công vào cho ca ${shift.name}`,
+      triggerTime: trigger,
+      type: "check-in",
+      data: { shiftId: shift.id },
     })
 
-    console.log(`Scheduled check-in notification for ${trigger.toLocaleString()}, ID: ${notificationId}`)
-    return notificationId
+    console.log(`Scheduled check-in alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`)
+    return alarmId
   } catch (error) {
     console.error("Error scheduling check-in notification:", error)
     return null
   }
 }
 
-// Lên lịch thông báo chấm công ra
+// Lên lịch báo thức chấm công ra
 export const scheduleCheckOutNotification = async (shift) => {
   if (!shift) return null
 
   try {
     // Hủy thông báo chấm công ra hiện tại
-    await cancelNotificationsByType("check-out")
+    await cancelAlarmsByType("check-out")
 
     // Lấy ngày hiện tại
     const today = new Date()
@@ -232,19 +238,17 @@ export const scheduleCheckOutNotification = async (shift) => {
       trigger.setDate(trigger.getDate() + 1)
     }
 
-    // Lên lịch thông báo
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Đã đến giờ chấm công ra",
-        body: `Đã đến giờ kết thúc ca ${shift.name}, hãy chấm công ra`,
-        data: { type: "check-out", shiftId: shift.id },
-        sound: true,
-      },
-      trigger,
+    // Lên lịch báo thức thay vì thông báo thông thường
+    const alarmId = await scheduleAlarm({
+      title: "Đã đến giờ chấm công ra",
+      body: `Đã đến giờ kết thúc ca ${shift.name}, hãy chấm công ra`,
+      triggerTime: trigger,
+      type: "check-out",
+      data: { shiftId: shift.id },
     })
 
-    console.log(`Scheduled check-out notification for ${trigger.toLocaleString()}, ID: ${notificationId}`)
-    return notificationId
+    console.log(`Scheduled check-out alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`)
+    return alarmId
   } catch (error) {
     console.error("Error scheduling check-out notification:", error)
     return null
@@ -284,6 +288,9 @@ export const scheduleAllNotifications = async (shift) => {
     const checkInId = await scheduleCheckInNotification(shift)
     const checkOutId = await scheduleCheckOutNotification(shift)
 
+    // Lên lịch thông báo cho các ghi chú liên quan đến ca làm việc này
+    await scheduleNoteNotifications(shift.id)
+
     return {
       departureId,
       checkInId,
@@ -295,24 +302,101 @@ export const scheduleAllNotifications = async (shift) => {
   }
 }
 
+// Lên lịch thông báo cho các ghi chú
+export const scheduleNoteNotifications = async (shiftId = null) => {
+  try {
+    // Lấy tất cả ghi chú
+    const notes = await getNotes()
+    if (!notes || notes.length === 0) return []
+
+    // Lấy ngày hiện tại và ngày trong tuần
+    const today = new Date()
+    const dayOfWeek = today.toLocaleString("en-US", { weekday: "short" }) // 'Sun', 'Mon', etc.
+    const todayDay = today.getDay() // 0 = Sunday, 1 = Monday, ...
+
+    // Lọc ghi chú cần thông báo
+    const notesToNotify = []
+
+    for (const note of notes) {
+      let shouldNotify = false
+
+      // Trường hợp 1: Ghi chú liên kết với ca làm việc cụ thể
+      if (note.associatedShiftIds && note.associatedShiftIds.length > 0) {
+        // Nếu không có shiftId được chỉ định, kiểm tra tất cả ca
+        if (!shiftId) {
+          // Kiểm tra từng ca liên kết
+          for (const id of note.associatedShiftIds) {
+            const shift = await getShiftById(id)
+            if (shift && shift.daysApplied && shift.daysApplied[todayDay]) {
+              shouldNotify = true
+              break
+            }
+          }
+        }
+        // Nếu có shiftId được chỉ định, chỉ kiểm tra ca đó
+        else if (note.associatedShiftIds.includes(shiftId)) {
+          const shift = await getShiftById(shiftId)
+          if (shift && shift.daysApplied && shift.daysApplied[todayDay]) {
+            shouldNotify = true
+          }
+        }
+      }
+      // Trường hợp 2: Ghi chú không liên kết với ca nào, sử dụng explicitReminderDays
+      else if (
+        (!note.associatedShiftIds || note.associatedShiftIds.length === 0) &&
+        note.explicitReminderDays &&
+        note.explicitReminderDays.includes(dayOfWeek)
+      ) {
+        shouldNotify = true
+      }
+
+      if (shouldNotify) {
+        notesToNotify.push(note)
+      }
+    }
+
+    // Lên lịch thông báo cho các ghi chú đã lọc
+    const notificationIds = []
+
+    for (const note of notesToNotify) {
+      // Phân tích thời gian nhắc nhở
+      const reminderDate = new Date(note.reminderTime)
+      const hours = reminderDate.getHours()
+      const minutes = reminderDate.getMinutes()
+
+      // Tạo thời gian kích hoạt thông báo
+      const trigger = new Date()
+      trigger.setHours(hours, minutes, 0, 0)
+
+      // Nếu thời gian đã qua, không lên lịch
+      if (trigger <= new Date()) {
+        continue
+      }
+
+      // Lên lịch báo thức với ưu tiên cao
+      const alarmId = await scheduleAlarm({
+        title: note.title,
+        body: note.content,
+        triggerTime: trigger,
+        type: "note",
+        data: { noteId: note.id },
+      })
+
+      console.log(`Scheduled note alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`)
+      notificationIds.push(alarmId)
+    }
+
+    return notificationIds
+  } catch (error) {
+    console.error("Error scheduling note notifications:", error)
+    return []
+  }
+}
+
 // Hủy thông báo theo loại
 export const cancelNotificationsByType = async (type) => {
   try {
-    // Lấy tất cả thông báo đã lên lịch
-    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync()
-
-    // Lọc thông báo theo loại
-    const notificationsToCancel = scheduledNotifications.filter(
-      (notification) => notification.content.data?.type === type,
-    )
-
-    // Hủy từng thông báo
-    for (const notification of notificationsToCancel) {
-      await Notifications.cancelScheduledNotificationAsync(notification.identifier)
-      console.log(`Canceled ${type} notification: ${notification.identifier}`)
-    }
-
-    return true
+    return await cancelAlarmsByType(type)
   } catch (error) {
     console.error(`Error canceling ${type} notifications:`, error)
     return false
@@ -322,9 +406,7 @@ export const cancelNotificationsByType = async (type) => {
 // Hủy tất cả thông báo
 export const cancelAllNotifications = async () => {
   try {
-    await Notifications.cancelAllScheduledNotificationsAsync()
-    console.log("Canceled all scheduled notifications")
-    return true
+    return await cancelAllAlarms()
   } catch (error) {
     console.error("Error canceling all notifications:", error)
     return false
@@ -353,14 +435,22 @@ export const scheduleNotificationsForActiveShift = async () => {
 // Xử lý thông báo khi nhận được
 export const handleReceivedNotification = async (notification) => {
   try {
-    const { type, shiftId } = notification.request.content.data || {}
+    const { type, shiftId, noteId } = notification.request.content.data || {}
 
     if (!type) return
 
     // Ghi log thông báo đã nhận
     console.log(`Received notification of type: ${type}`)
 
-    // Có thể thêm logic xử lý khác tùy thuộc vào loại thông báo
+    // Kích hoạt báo thức ngay lập tức nếu là thông báo quan trọng
+    if (type === "departure" || type === "check-in" || type === "check-out") {
+      await triggerAlarmNow({
+        title: notification.request.content.title,
+        body: notification.request.content.body,
+        type,
+        data: { shiftId, noteId },
+      })
+    }
 
     return true
   } catch (error) {
@@ -383,9 +473,11 @@ export const setupNotificationListeners = () => {
   })
 
   // Trả về hàm cleanup
-  return () => {
-    foregroundSubscription.remove()
-    responseSubscription.remove()
+  return {
+    removeNotificationListeners: () => {
+      foregroundSubscription.remove()
+      responseSubscription.remove()
+    },
   }
 }
 

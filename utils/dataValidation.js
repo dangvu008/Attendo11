@@ -97,16 +97,38 @@ export const validateNote = (note) => {
     return { isValid: false, error: "Note title is required" }
   }
 
+  if (note.title.length > 100) {
+    return { isValid: false, error: "Title cannot exceed 100 characters" }
+  }
+
   if (!note.content || typeof note.content !== "string" || note.content.trim() === "") {
     return { isValid: false, error: "Note content is required" }
+  }
+
+  if (note.content.length > 300) {
+    return { isValid: false, error: "Content cannot exceed 300 characters" }
   }
 
   if (note.reminderTime && !(new Date(note.reminderTime) instanceof Date)) {
     return { isValid: false, error: "Invalid reminder time" }
   }
 
-  if (note.days && (!Array.isArray(note.days) || note.days.length !== 7)) {
-    return { isValid: false, error: "Days must be an array of 7 boolean values" }
+  // Validate associatedShiftIds
+  if (note.associatedShiftIds !== undefined && !Array.isArray(note.associatedShiftIds)) {
+    return { isValid: false, error: "Associated shift IDs must be an array" }
+  }
+
+  // Validate explicitReminderDays
+  if (note.explicitReminderDays !== undefined && !Array.isArray(note.explicitReminderDays)) {
+    return { isValid: false, error: "Explicit reminder days must be an array" }
+  }
+
+  // If associatedShiftIds is empty, explicitReminderDays should have at least one day
+  if (
+    (!note.associatedShiftIds || note.associatedShiftIds.length === 0) &&
+    (!note.explicitReminderDays || note.explicitReminderDays.length === 0)
+  ) {
+    return { isValid: false, error: "Either associate with shifts or select specific days" }
   }
 
   return { isValid: true, error: null }

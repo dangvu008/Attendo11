@@ -1,814 +1,229 @@
-"use client";
+"use client"
 
-import { createContext, useState, useEffect } from "react";
-import { getTranslation } from "../utils/translations";
+import { createContext, useState, useEffect } from "react"
+import { getTranslation } from "../utils/translations"
 import {
   initializeDatabase,
   getUserSettings,
   updateUserSettings,
   getShiftList,
   getActiveShift,
-  setActiveShift as setActiveShiftDB,
   addShift as addShiftDB,
-  updateShift as updateShiftDB,
-  deleteShift as deleteShiftDB,
   getAttendanceLogs,
-  addAttendanceLog as addAttendanceLogDB,
   resetTodayAttendanceLogs,
   getDailyWorkStatus,
-  updateDailyWorkStatus,
   getNotes,
-  addNote as addNoteDB,
-  updateNote as updateNoteDB,
-  deleteNote as deleteNoteDB,
-  getAttendanceLogByType,
   createDataBackup,
-  restoreFromBackup,
-  exportAllData,
-  importData,
-} from "../utils/database";
+} from "../utils/database"
 import {
   configureNotifications,
   scheduleNotificationsForActiveShift,
-  cancelNotificationsByType,
-  cancelAllNotifications,
   setupNotificationListeners,
-} from "../utils/notificationUtils";
-import { checkIfResetNeeded } from "../utils/workStatusUtils";
-import { validateTimeInterval } from "../utils/timeRules";
-import { updateWorkStatusForNewLog } from "../utils/workStatusUtils";
-import { scheduleAutomaticBackup } from "../utils/dataBackupUtils";
-import { Alert } from "react-native";
-import { generateSampleData } from "../utils/sampleData";
+} from "../utils/notificationUtils"
+import { initializeAlarmSystem } from "../utils/alarmUtils"
+import { checkIfResetNeeded } from "../utils/workStatusUtils"
+import { scheduleAutomaticBackup } from "../utils/dataBackupUtils"
 
 // Create context
-export const AppContext = createContext();
+export const AppContext = createContext()
 
 // Provider component
 export const AppProvider = ({ children }) => {
   // State
-  const [darkMode, setDarkMode] = useState(true);
-  const [language, setLanguage] = useState("vi");
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [vibrationEnabled, setVibrationEnabled] = useState(true);
-  const [multiButtonMode, setMultiButtonMode] = useState(false);
-  const [shifts, setShifts] = useState([]);
-  const [currentShift, setCurrentShift] = useState(null);
-  const [todayLogs, setTodayLogs] = useState([]);
+  const [darkMode, setDarkMode] = useState(true)
+  const [language, setLanguage] = useState("vi")
+  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [vibrationEnabled, setVibrationEnabled] = useState(true)
+  const [multiButtonMode, setMultiButtonMode] = useState(false)
+  const [alarmEnabled, setAlarmEnabled] = useState(true) // New state for alarm mode
+  const [shifts, setShifts] = useState([])
+  const [currentShift, setCurrentShift] = useState(null)
+  const [todayLogs, setTodayLogs] = useState([])
   const [workStatus, setWorkStatus] = useState({
     status: "Chưa cập nhật",
     totalWorkTime: 0,
     overtime: 0,
     remarks: "",
-  });
-  const [notes, setNotes] = useState([]);
-  const [weeklyStatus, setWeeklyStatus] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [dataError, setDataError] = useState(null);
+  })
+  const [notes, setNotes] = useState([])
+  const [weeklyStatus, setWeeklyStatus] = useState({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [dataError, setDataError] = useState(null)
+  const [showAlarmModal, setShowAlarmModal] = useState(false) // State for alarm modal
+  const [alarmData, setAlarmData] = useState(null) // State for alarm data
+  const [weeklyStatusRefreshTrigger, setWeeklyStatusRefreshTrigger] = useState(0)
 
   // Translation function
-  const t = (key) => getTranslation(key, language);
-
-  // Kiểm tra và thực hiện reset tự động
-  const checkAndResetStatus = async () => {
-    try {
-      const resetNeeded = await checkIfResetNeeded();
-      if (resetNeeded) {
-        console.log("Auto reset needed, resetting today's logs...");
-        await resetTodayAttendanceLogs();
-
-        // Cập nhật state để hiển thị trạng thái ban đầu
-        setTodayLogs([]);
-
-        // Reset work status
-        const today = new Date().toISOString().split("T")[0];
-        const resetStatus = {
-          status: "Chưa cập nhật",
-          totalWorkTime: 0,
-          overtime: 0,
-          remarks: "",
-        };
-        await updateDailyWorkStatus(today, resetStatus);
-        setWorkStatus(resetStatus);
-
-        console.log("Auto reset completed successfully");
-      }
-    } catch (error) {
-      console.error("Error in auto reset check:", error);
-    }
-  };
+  const t = (key) => getTranslation(key, language)
 
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {
       try {
-        setIsLoading(true);
+        setIsLoading(true)
 
         // Initialize database
-        await initializeDatabase();
+        await initializeDatabase()
 
         // Configure notifications
-        await configureNotifications();
+        await configureNotifications()
+
+        // Initialize alarm system
+        await initializeAlarmSystem()
 
         // Setup notification listeners
-        const { removeNotificationListeners } = setupNotificationListeners();
-        const cleanupListeners = removeNotificationListeners;
+        const { removeNotificationListeners } = setupNotificationListeners()
+        const cleanupListeners = removeNotificationListeners
 
         // Check if reset is needed
-        const resetNeeded = await checkIfResetNeeded();
+        const resetNeeded = await checkIfResetNeeded()
         if (resetNeeded) {
-          await resetTodayAttendanceLogs();
+          await resetTodayAttendanceLogs()
         }
 
         // Load user settings
-        const settings = await getUserSettings();
+        const settings = await getUserSettings()
         if (settings) {
-          setDarkMode(settings.darkMode);
-          setLanguage(settings.language);
-          setSoundEnabled(settings.soundEnabled);
-          setVibrationEnabled(settings.vibrationEnabled);
-          setMultiButtonMode(settings.multiButtonMode);
+          setDarkMode(settings.darkMode)
+          setLanguage(settings.language)
+          setSoundEnabled(settings.soundEnabled)
+          setVibrationEnabled(settings.vibrationEnabled)
+          setMultiButtonMode(settings.multiButtonMode)
+          setAlarmEnabled(settings.alarmEnabled !== undefined ? settings.alarmEnabled : true)
         }
 
         // Load shifts
-        const shiftList = await getShiftList();
-        setShifts(shiftList);
+        const shiftList = await getShiftList()
+        setShifts(shiftList)
 
         // Load active shift
-        const activeShift = await getActiveShift();
-        setCurrentShift(activeShift);
+        const activeShift = await getActiveShift()
+        setCurrentShift(activeShift)
 
         // Schedule notifications for active shift
         if (activeShift) {
-          await scheduleNotificationsForActiveShift();
+          await scheduleNotificationsForActiveShift()
         }
 
         // Load today's attendance logs
-        const today = new Date().toISOString().split("T")[0];
-        const logs = await getAttendanceLogs(today);
-        setTodayLogs(logs);
+        const today = new Date().toISOString().split("T")[0]
+        const logs = await getAttendanceLogs(today)
+        setTodayLogs(logs)
 
         // Load today's work status
-        const status = await getDailyWorkStatus(today);
+        const status = await getDailyWorkStatus(today)
         if (status) {
-          setWorkStatus(status);
+          setWorkStatus(status)
         }
 
         // Load notes
-        const notesList = await getNotes();
-        setNotes(notesList);
+        const notesList = await getNotes()
+        setNotes(notesList)
 
         // Schedule automatic backup
-        await scheduleAutomaticBackup();
+        await scheduleAutomaticBackup()
 
-        setIsLoading(false);
+        setIsLoading(false)
       } catch (error) {
-        console.error("Error loading data:", error);
-        setDataError(
-          "Failed to load application data. Please restart the app."
-        );
-        setIsLoading(false);
+        console.error("Error loading data:", error)
+        setDataError("Failed to load application data. Please restart the app.")
+        setIsLoading(false)
       }
-    };
+    }
 
-    loadData();
-
-    // Thiết lập kiểm tra reset tự động mỗi 15 phút
-    const autoResetInterval = setInterval(checkAndResetStatus, 15 * 60 * 1000);
+    loadData()
 
     // Cleanup function
     return () => {
       // Cleanup notification listeners if needed
       if (typeof cleanupListeners === "function") {
-        cleanupListeners();
+        cleanupListeners()
       }
-
-      // Clear auto reset interval
-      clearInterval(autoResetInterval);
-    };
-  }, []);
+    }
+  }, [])
 
   // Update user settings
   const handleUpdateSettings = async (newSettings) => {
     try {
-      const success = await updateUserSettings(newSettings);
+      const success = await updateUserSettings(newSettings)
       if (success) {
         // Update state
-        if (newSettings.darkMode !== undefined)
-          setDarkMode(newSettings.darkMode);
-        if (newSettings.language !== undefined)
-          setLanguage(newSettings.language);
-        if (newSettings.soundEnabled !== undefined)
-          setSoundEnabled(newSettings.soundEnabled);
-        if (newSettings.vibrationEnabled !== undefined)
-          setVibrationEnabled(newSettings.vibrationEnabled);
-        if (newSettings.multiButtonMode !== undefined)
-          setMultiButtonMode(newSettings.multiButtonMode);
+        if (newSettings.darkMode !== undefined) setDarkMode(newSettings.darkMode)
+        if (newSettings.language !== undefined) setLanguage(newSettings.language)
+        if (newSettings.soundEnabled !== undefined) setSoundEnabled(newSettings.soundEnabled)
+        if (newSettings.vibrationEnabled !== undefined) setVibrationEnabled(newSettings.vibrationEnabled)
+        if (newSettings.multiButtonMode !== undefined) setMultiButtonMode(newSettings.multiButtonMode)
+        if (newSettings.alarmEnabled !== undefined) setAlarmEnabled(newSettings.alarmEnabled)
 
         // Create backup after updating settings
-        await createDataBackup();
+        await createDataBackup()
 
-        return true;
+        return true
       }
-      return false;
+      return false
     } catch (error) {
-      console.error("Error updating settings:", error);
-      return false;
+      console.error("Error updating settings:", error)
+      return false
     }
-  };
+  }
 
   // Add a new shift
   const handleAddShift = async (shift) => {
     try {
-      const newShift = await addShiftDB(shift);
+      const newShift = await addShiftDB(shift)
       if (newShift) {
-        setShifts([...shifts, newShift]);
-        return newShift;
+        setShifts([...shifts, newShift])
+        return newShift
       }
-      return null;
+      return null
     } catch (error) {
-      console.error("Error adding shift:", error);
-      return null;
+      console.error("Error adding shift:", error)
+      return null
     }
-  };
+  }
 
   // Update an existing shift
-  const handleUpdateShift = async (updatedShift) => {
-    try {
-      const success = await updateShiftDB(updatedShift);
-      if (success) {
-        // Update shifts array
-        setShifts(
-          shifts.map((shift) =>
-            shift.id === updatedShift.id ? updatedShift : shift
-          )
-        );
-
-        // Update current shift if it's the one being updated
-        if (currentShift && currentShift.id === updatedShift.id) {
-          setCurrentShift({
-            ...updatedShift,
-            appliedDate: currentShift.appliedDate,
-          });
-
-          // Reschedule notifications if current shift was updated
-          await scheduleNotificationsForActiveShift();
-        }
-
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error updating shift:", error);
-      return false;
-    }
-  };
-
-  // Delete a shift
-  const handleDeleteShift = async (shiftId) => {
-    try {
-      const success = await deleteShiftDB(shiftId);
-      if (success) {
-        // Update shifts array
-        setShifts(shifts.filter((shift) => shift.id !== shiftId));
-
-        // Clear current shift if it's the one being deleted
-        if (currentShift && currentShift.id === shiftId) {
-          setCurrentShift(null);
-
-          // Cancel notifications if current shift was deleted
-          await cancelAllNotifications();
-        }
-
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error deleting shift:", error);
-      return false;
-    }
-  };
-
-  // Set active shift
-  const handleSetActiveShift = async (shiftId) => {
-    try {
-      const success = await setActiveShiftDB(shiftId);
-      if (success) {
-        const shift = shifts.find((s) => s.id === shiftId);
-        if (shift) {
-          const today = new Date().toISOString().split("T")[0];
-          setCurrentShift({
-            ...shift,
-            appliedDate: today,
-          });
-
-          // Reset today's logs when changing shifts
-          await resetTodayAttendanceLogs();
-          setTodayLogs([]);
-
-          // Cancel all notifications
-          await cancelAllNotifications();
-
-          // Schedule notifications for new shift
-          await scheduleNotificationsForActiveShift();
-
-          return true;
-        }
-      }
-      return false;
-    } catch (error) {
-      console.error("Error setting active shift:", error);
-      return false;
-    }
-  };
-
-  // Add attendance log
-  const handleAddAttendanceLog = async (logType, force = false) => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-
-      // If not forcing the action, validate time rules
-      if (!force) {
-        let previousActionType = null;
-        let previousActionTime = null;
-
-        if (logType === "check_in") {
-          const goWorkLog = await getAttendanceLogByType(today, "go_work");
-          if (goWorkLog) {
-            previousActionType = "go_work";
-            previousActionTime = goWorkLog.timestamp;
-          }
-        } else if (logType === "check_out") {
-          const checkInLog = await getAttendanceLogByType(today, "check_in");
-          if (checkInLog) {
-            previousActionType = "check_in";
-            previousActionTime = checkInLog.timestamp;
-          }
-        }
-
-        // Validate time interval
-        const validation = validateTimeInterval(
-          previousActionType,
-          previousActionTime,
-          logType
-        );
-        if (!validation.isValid && !force) {
-          return {
-            success: false,
-            message: validation.message,
-            needsConfirmation: true,
-          };
-        }
-      }
-
-      // Add the attendance log
-      const newLog = await addAttendanceLogDB(today, logType);
-      if (newLog) {
-        // Update local state
-        setTodayLogs([...todayLogs, newLog]);
-
-        // Update work status based on the new log
-        const updatedStatus = await updateWorkStatusForNewLog(today, logType);
-        if (updatedStatus) {
-          setWorkStatus(updatedStatus);
-        }
-
-        // Cancel corresponding notification
-        if (logType === "go_work") {
-          await cancelNotificationsByType("departure");
-        } else if (logType === "check_in") {
-          await cancelNotificationsByType("check-in");
-        } else if (logType === "check_out") {
-          await cancelNotificationsByType("check-out");
-        } else if (logType === "complete") {
-          // Cancel all notifications when complete
-          await cancelAllNotifications();
-
-          // Reschedule notifications for next day
-          if (currentShift) {
-            await scheduleNotificationsForActiveShift();
-          }
-        }
-
-        return { success: true, log: newLog };
-      }
-
-      return { success: false, message: "Failed to add attendance log" };
-    } catch (error) {
-      console.error("Error adding attendance log:", error);
-      return { success: false, message: error.message };
-    }
-  };
-
-  // Reset today's logs
-  const handleResetTodayLogs = async () => {
-    try {
-      const success = await resetTodayAttendanceLogs();
-      if (success) {
-        setTodayLogs([]);
-
-        // Reset work status
-        const today = new Date().toISOString().split("T")[0];
-        const resetStatus = {
-          status: "Chưa cập nhật",
-          totalWorkTime: 0,
-          overtime: 0,
-          remarks: "",
-        };
-        await updateDailyWorkStatus(today, resetStatus);
-        setWorkStatus(resetStatus);
-
-        // Cancel all notifications
-        await cancelAllNotifications();
-
-        // Reschedule notifications
-        if (currentShift) {
-          await scheduleNotificationsForActiveShift();
-        }
-
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error resetting today's logs:", error);
-      return false;
-    }
-  };
-
-  // Add a new note
-  const handleAddNote = async (note) => {
-    try {
-      const newNote = await addNoteDB(note);
-      if (newNote) {
-        setNotes([...notes, newNote]);
-        return newNote;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error adding note:", error);
-      return null;
-    }
-  };
-
-  // Update an existing note
-  const handleUpdateNote = async (updatedNote) => {
-    try {
-      const success = await updateNoteDB(updatedNote);
-      if (success) {
-        setNotes(
-          notes.map((note) => (note.id === updatedNote.id ? updatedNote : note))
-        );
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error updating note:", error);
-      return false;
-    }
-  };
-
-  // Delete a note
-  const handleDeleteNote = async (noteId) => {
-    try {
-      const success = await deleteNoteDB(noteId);
-      if (success) {
-        setNotes(notes.filter((note) => note.id !== noteId));
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error deleting note:", error);
-      return false;
-    }
-  };
-
-  // Create data backup
-  const handleCreateBackup = async () => {
-    try {
-      const success = await createDataBackup();
-      if (success) {
-        Alert.alert("Backup Success", "Data backup created successfully");
-        return true;
-      } else {
-        Alert.alert("Backup Error", "Failed to create data backup");
-        return false;
-      }
-    } catch (error) {
-      console.error("Error creating backup:", error);
-      Alert.alert(
-        "Backup Error",
-        "An error occurred while creating backup: " + error.message
-      );
-      return false;
-    }
-  };
-
-  // Restore from backup
-  const handleRestoreBackup = async () => {
-    try {
-      Alert.alert(
-        "Restore Backup",
-        "Are you sure you want to restore from backup? This will replace all current data.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Restore",
-            onPress: async () => {
-              setIsLoading(true);
-
-              const success = await restoreFromBackup();
-
-              if (success) {
-                // Reload all data after restore
-                const settings = await getUserSettings();
-                if (settings) {
-                  setDarkMode(settings.darkMode);
-                  setLanguage(settings.language);
-                  setSoundEnabled(settings.soundEnabled);
-                  setVibrationEnabled(settings.vibrationEnabled);
-                  setMultiButtonMode(settings.multiButtonMode);
-                }
-
-                const shiftList = await getShiftList();
-                setShifts(shiftList);
-
-                const activeShift = await getActiveShift();
-                setCurrentShift(activeShift);
-
-                const today = new Date().toISOString().split("T")[0];
-                const logs = await getAttendanceLogs(today);
-                setTodayLogs(logs);
-
-                const status = await getDailyWorkStatus(today);
-                if (status) {
-                  setWorkStatus(status);
-                }
-
-                const notesList = await getNotes();
-                setNotes(notesList);
-
-                // Reschedule notifications
-                await cancelAllNotifications();
-                if (activeShift) {
-                  await scheduleNotificationsForActiveShift();
-                }
-
-                setIsLoading(false);
-                Alert.alert(
-                  "Restore Success",
-                  "Data has been successfully restored from backup"
-                );
-                return true;
-              } else {
-                setIsLoading(false);
-                Alert.alert(
-                  "Restore Error",
-                  "Failed to restore data from backup"
-                );
-                return false;
-              }
-            },
-          },
-        ]
-      );
-      return true;
-    } catch (error) {
-      console.error("Error restoring from backup:", error);
-      Alert.alert(
-        "Restore Error",
-        "An error occurred while restoring from backup: " + error.message
-      );
-      return false;
-    }
-  };
-
-  // Export data
-  const handleExportData = async () => {
-    try {
-      const jsonData = await exportAllData();
-      if (jsonData) {
-        // Share data
-        // Note: In a real app, you would use Share API or save to a file
-        Alert.alert("Export Success", "Data exported successfully");
-        return true;
-      } else {
-        Alert.alert("Export Error", "Failed to export data");
-        return false;
-      }
-    } catch (error) {
-      console.error("Error exporting data:", error);
-      Alert.alert(
-        "Export Error",
-        "An error occurred while exporting data: " + error.message
-      );
-      return false;
-    }
-  };
-
-  // Import data
-  const handleImportData = async (jsonData) => {
-    try {
-      if (!jsonData) {
-        Alert.alert("Import Error", "No data provided for import");
-        return false;
-      }
-
-      Alert.alert(
-        "Import Data",
-        "Are you sure you want to import data? This will replace all current data.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Import",
-            onPress: async () => {
-              setIsLoading(true);
-
-              const success = await importData(jsonData);
-
-              if (success) {
-                // Reload all data after import
-                const settings = await getUserSettings();
-                if (settings) {
-                  setDarkMode(settings.darkMode);
-                  setLanguage(settings.language);
-                  setSoundEnabled(settings.soundEnabled);
-                  setVibrationEnabled(settings.vibrationEnabled);
-                  setMultiButtonMode(settings.multiButtonMode);
-                }
-
-                const shiftList = await getShiftList();
-                setShifts(shiftList);
-
-                const activeShift = await getActiveShift();
-                setCurrentShift(activeShift);
-
-                const today = new Date().toISOString().split("T")[0];
-                const logs = await getAttendanceLogs(today);
-                setTodayLogs(logs);
-
-                const status = await getDailyWorkStatus(today);
-                if (status) {
-                  setWorkStatus(status);
-                }
-
-                const notesList = await getNotes();
-                setNotes(notesList);
-
-                // Reschedule notifications
-                await cancelAllNotifications();
-                if (activeShift) {
-                  await scheduleNotificationsForActiveShift();
-                }
-
-                setIsLoading(false);
-                Alert.alert(
-                  "Import Success",
-                  "Data has been successfully imported"
-                );
-                return true;
-              } else {
-                setIsLoading(false);
-                Alert.alert("Import Error", "Failed to import data");
-                return false;
-              }
-            },
-          },
-        ]
-      );
-      return true;
-    } catch (error) {
-      console.error("Error importing data:", error);
-      Alert.alert(
-        "Import Error",
-        "An error occurred while importing data: " + error.message
-      );
-      return false;
-    }
-  };
+  const handleUpdateShift = async (updatedShift) => {}
 
   // Context value
   const contextValue = {
-    // State
     darkMode,
+    setDarkMode,
     language,
+    setLanguage,
+    t,
     soundEnabled,
+    setSoundEnabled,
     vibrationEnabled,
+    setVibrationEnabled,
     multiButtonMode,
+    setMultiButtonMode,
+    alarmEnabled,
+    setAlarmEnabled,
+    handleUpdateSettings,
     shifts,
+    setShifts,
+    handleAddShift,
     currentShift,
+    setCurrentShift,
     todayLogs,
+    setTodayLogs,
     workStatus,
+    setWorkStatus,
     notes,
+    setNotes,
     weeklyStatus,
+    setWeeklyStatus,
     isLoading,
     dataError,
+    showAlarmModal,
+    setShowAlarmModal,
+    alarmData,
+    setAlarmData,
+    weeklyStatusRefreshTrigger,
+    refreshWeeklyStatus: () => setWeeklyStatusRefreshTrigger((prev) => prev + 1),
+  }
 
-    // Translation
-    t,
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
+}
 
-    // Settings
-    handleUpdateSettings,
-
-    // Actions
-    setDarkMode: (value) => handleUpdateSettings({ darkMode: value }),
-    setLanguage: (value) => handleUpdateSettings({ language: value }),
-    setSoundEnabled: (value) => handleUpdateSettings({ soundEnabled: value }),
-    setVibrationEnabled: (value) =>
-      handleUpdateSettings({ vibrationEnabled: value }),
-    setMultiButtonMode: (value) =>
-      handleUpdateSettings({ multiButtonMode: value }),
-
-    // Shift management
-    addShift: handleAddShift,
-    updateShift: handleUpdateShift,
-    deleteShift: handleDeleteShift,
-    setCurrentShift: handleSetActiveShift,
-
-    // Attendance management
-    addAttendanceLog: handleAddAttendanceLog,
-    resetTodayLogs: handleResetTodayLogs,
-
-    // Note management
-    addNote: handleAddNote,
-    updateNote: handleUpdateNote,
-    deleteNote: handleDeleteNote,
-
-    // Data management
-    createBackup: handleCreateBackup,
-    restoreBackup: handleRestoreBackup,
-    exportData: handleExportData,
-    importData: handleImportData,
-
-    // Sample data
-    applySampleData: async () => {
-      try {
-        setIsLoading(true);
-
-        const sampleData = await generateSampleData();
-        if (!sampleData) {
-          Alert.alert("Lỗi", "Không thể tạo dữ liệu mẫu.");
-          setIsLoading(false);
-          return false;
-        }
-
-        // Lưu các ca làm việc mẫu
-        for (const shift of sampleData.shifts) {
-          await addShiftDB(shift);
-        }
-        setShifts(sampleData.shifts);
-
-        // Đặt ca làm việc đầu tiên là ca hiện tại
-        if (sampleData.shifts.length > 0) {
-          await setActiveShiftDB(sampleData.shifts[0].id);
-          setCurrentShift({
-            ...sampleData.shifts[0],
-            appliedDate: new Date().toISOString().split("T")[0],
-          });
-        }
-
-        // Lưu các nhật ký chấm công mẫu
-        const today = new Date().toISOString().split("T")[0];
-        await resetTodayAttendanceLogs();
-
-        for (const log of sampleData.logs) {
-          await addAttendanceLogDB(today, log.type, new Date(log.timestamp));
-        }
-        setTodayLogs(sampleData.logs);
-
-        // Lưu các ghi chú mẫu
-        for (const note of sampleData.notes) {
-          await addNoteDB(note);
-        }
-        setNotes(sampleData.notes);
-
-        // Cập nhật trạng thái làm việc
-        await updateDailyWorkStatus(today, sampleData.workStatus);
-        setWorkStatus(sampleData.workStatus);
-
-        // Tạo backup sau khi tạo dữ liệu mẫu
-        await createDataBackup();
-
-        setIsLoading(false);
-        Alert.alert(
-          "Thành công",
-          "Dữ liệu mẫu đã được tạo và áp dụng thành công.",
-          [{ text: "OK" }]
-        );
-
-        return true;
-      } catch (error) {
-        console.error("Lỗi khi áp dụng dữ liệu mẫu:", error);
-        setIsLoading(false);
-        Alert.alert(
-          "Lỗi",
-          "Đã xảy ra lỗi khi áp dụng dữ liệu mẫu: " + error.message
-        );
-        return false;
-      }
-    },
-  };
-
-  return (
-    <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
-  );
-};
