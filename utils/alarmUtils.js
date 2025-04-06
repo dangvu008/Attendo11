@@ -13,6 +13,7 @@ import {
 import * as KeepAwake from "expo-keep-awake";
 import { STORAGE_KEYS } from "./database";
 import React, { useEffect } from "react";
+import { logTaskExecution } from "./taskDebugUtils";
 
 /**
  * Alarm Utilities Module
@@ -22,7 +23,7 @@ import React, { useEffect } from "react";
  */
 
 // Define task names
-const BACKGROUND_ALARM_TASK = "BACKGROUND_ALARM_TASK";
+export const BACKGROUND_ALARM_TASK = "BACKGROUND_ALARM_TASK";
 const ALARM_CHANNEL_ID = "attendo-alarms";
 
 // Sound objects
@@ -72,35 +73,56 @@ export const initializeAlarmSystem = async () => {
  */
 const registerBackgroundAlarmTask = async () => {
   try {
-    // Check if task is already registered
+    // Kiểm tra xem task đã được đăng ký chưa
     const isRegistered = await TaskManager.isTaskRegisteredAsync(
       BACKGROUND_ALARM_TASK
     );
 
     if (!isRegistered) {
-      // Define task
+      // Định nghĩa task
       TaskManager.defineTask(BACKGROUND_ALARM_TASK, async () => {
         try {
-          // Check for upcoming alarms and schedule them
+          console.log("Background Alarm Task đang chạy...");
+
+          // Kiểm tra và dọn dẹp thông báo trùng lặp
+          await cleanupDuplicateNotifications();
+
+          // Kiểm tra và lên lịch cảnh báo
           const result = await checkAndScheduleAlarms();
+
+          // Ghi nhận lịch sử chạy task
+          await logTaskExecution(BACKGROUND_ALARM_TASK, {
+            result,
+            notificationsCount: (
+              await Notifications.getAllScheduledNotificationsAsync()
+            ).length,
+          });
+
           return result
             ? BackgroundFetch.BackgroundFetchResult.NewData
             : BackgroundFetch.BackgroundFetchResult.NoData;
         } catch (error) {
-          console.error("Error in background alarm task:", error);
+          console.error("Lỗi trong background alarm task:", error);
+          await logTaskExecution(BACKGROUND_ALARM_TASK, {
+            error: error.message,
+          });
           return BackgroundFetch.BackgroundFetchResult.Failed;
         }
       });
 
-      // Register background fetch
+      // Đăng ký background fetch
       await BackgroundFetch.registerTaskAsync(BACKGROUND_ALARM_TASK, {
-        minimumInterval: 15 * 60, // 15 minutes
+        minimumInterval: 15 * 60, // 15 phút
         stopOnTerminate: false,
         startOnBoot: true,
       });
+
+      console.log("Đã đăng ký Background Alarm Task");
+    } else {
+      console.log("Background Alarm Task đã được đăng ký trước đó");
     }
   } catch (error) {
-    console.error("Error registering background alarm task:", error);
+    console.error("Lỗi khi đăng ký background alarm task:", error);
   }
 };
 
@@ -310,14 +332,39 @@ export const cancelAlarm = async (alarmId) => {
  */
 export const cancelAlarmsByType = async (type) => {
   try {
-    // For simplicity, we'll just cancel all notifications
-    // In a real app, you would filter by type
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log(`Canceled all alarms of type: ${type}`);
-    return true;
+    console.log(`Bắt đầu hủy thông báo loại: ${type}`);
+
+    // Lấy tất cả thông báo đã lên lịch
+    const notifications =
+      await Notifications.getAllScheduledNotificationsAsync();
+    let cancelCount = 0;
+
+    // Lọc thông báo theo loại và hủy chúng
+    for (const notification of notifications) {
+      const notificationType = notification.content?.data?.type;
+
+      if (notificationType === type) {
+        console.log(
+          `Hủy thông báo ID: ${notification.identifier}, loại: ${type}`
+        );
+        await Notifications.cancelScheduledNotificationAsync(
+          notification.identifier
+        );
+        cancelCount++;
+
+        // Đồng thời xóa ID khỏi bảng ánh xạ
+        const date = notification.content?.data?.date;
+        if (date) {
+          await removeNotificationId(type, date);
+        }
+      }
+    }
+
+    console.log(`Đã hủy ${cancelCount} thông báo loại: ${type}`);
+    return cancelCount;
   } catch (error) {
-    console.error(`Error canceling ${type} alarms:`, error);
-    return false;
+    console.error(`Lỗi khi hủy thông báo loại ${type}:`, error);
+    return 0;
   }
 };
 
@@ -757,4 +804,108 @@ export const initializeNotificationsCheck = () => {
   };
 
   checkNotifications();
+};
+
+// Lưu lịch sử chạy background task
+export const logTaskExecution = async (taskName, result) => {
+  try {
+    // Lấy lịch sử hiện tại
+    const taskHistoryJson =
+      (await AsyncStorage.getItem(STORAGE_KEYS.TASK_HISTORY)) || "[]";
+    const taskHistory = JSON.parse(taskHistoryJson);
+
+    // Thêm bản ghi mới
+    taskHistory.unshift({
+      taskName,
+      timestamp: new Date().toISOString(),
+      result: typeof result === "object" ? JSON.stringify(result) : result,
+    });
+
+    // Giới hạn lịch sử tối đa 100 bản ghi
+    const limitedHistory = taskHistory.slice(0, 100);
+
+    // Lưu lại lịch sử
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.TASK_HISTORY,
+      JSON.stringify(limitedHistory)
+    );
+    console.log(`Đã ghi nhận thực thi task: ${taskName}`);
+
+    return true;
+  } catch (error) {
+    console.error("Lỗi khi ghi nhận lịch sử task:", error);
+    return false;
+  }
+};
+
+// Lấy lịch sử chạy background task
+export const getTaskHistory = async () => {
+  try {
+    const taskHistoryJson =
+      (await AsyncStorage.getItem(STORAGE_KEYS.TASK_HISTORY)) || "[]";
+    return JSON.parse(taskHistoryJson);
+  } catch (error) {
+    console.error("Lỗi khi lấy lịch sử task:", error);
+    return [];
+  }
+};
+
+// Xóa lịch sử task
+export const clearTaskHistory = async () => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.TASK_HISTORY);
+    return true;
+  } catch (error) {
+    console.error("Lỗi khi xóa lịch sử task:", error);
+    return false;
+  }
+};
+
+// Lấy thông tin về tất cả background task đã đăng ký
+export const getRegisteredTasks = async () => {
+  try {
+    return await TaskManager.getRegisteredTasksAsync();
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách task đã đăng ký:", error);
+    return [];
+  }
+};
+
+// Hủy đăng ký một task
+export const unregisterTask = async (taskName) => {
+  try {
+    if (await TaskManager.isTaskRegisteredAsync(taskName)) {
+      // Hủy đăng ký với BackgroundFetch
+      await BackgroundFetch.unregisterTaskAsync(taskName);
+      console.log(`Đã hủy đăng ký task: ${taskName}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(`Lỗi khi hủy đăng ký task ${taskName}:`, error);
+    return false;
+  }
+};
+
+// Đăng ký lại task
+export const reregisterTask = async (taskName, options = {}) => {
+  try {
+    // Hủy đăng ký task hiện tại nếu có
+    if (await TaskManager.isTaskRegisteredAsync(taskName)) {
+      await BackgroundFetch.unregisterTaskAsync(taskName);
+    }
+
+    // Đăng ký lại task
+    await BackgroundFetch.registerTaskAsync(taskName, {
+      minimumInterval: options.minimumInterval || 15 * 60, // 15 phút
+      stopOnTerminate: options.stopOnTerminate || false,
+      startOnBoot: options.startOnBoot || true,
+    });
+
+    console.log(`Đã đăng ký lại task: ${taskName}`);
+    return true;
+  } catch (error) {
+    console.error(`Lỗi khi đăng ký lại task ${taskName}:`, error);
+    return false;
+  }
 };
