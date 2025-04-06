@@ -9,7 +9,7 @@ import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as BackgroundFetch from "expo-background-fetch";
 import * as TaskManager from "expo-task-manager";
-import { Platform, Vibration } from "react-native";
+import { Platform, Vibration, Alert } from "react-native";
 import * as KeepAwake from "expo-keep-awake";
 import { STORAGE_KEYS } from "./database";
 
@@ -361,45 +361,47 @@ export const handleAlarmResponse = async (notification) => {
  */
 export const scheduleNotificationsForActiveShift = async () => {
   try {
-    // Cancel all existing notifications
-    await cancelAllNotifications();
+    // 1. Hủy tất cả thông báo hiện tại
+    console.log("Hủy thông báo cũ trước khi lên lịch mới");
+    await Notifications.cancelAllScheduledNotificationsAsync();
 
-    // Get active shift
+    // 2. Lấy ca làm việc hiện tại
     const shift = await getActiveShift();
     if (!shift) {
-      console.log("No active shift found, not scheduling notifications");
+      console.log("Không tìm thấy ca làm việc, không lên lịch thông báo");
       return false;
     }
 
-    // Create fixed identifiers for each type of notification
-    const today = new Date().toISOString().split("T")[0];
-    const departureId = `departure-${today}-${shift.id}`;
-    const checkInId = `checkIn-${today}-${shift.id}`;
-    const checkOutId = `checkOut-${today}-${shift.id}`;
+    // 3. Kiểm tra xem hôm nay có phải ngày làm việc không
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Chủ nhật, 1 = Thứ 2...
 
-    // Schedule notifications with fixed IDs
-    const departureNotificationId = await scheduleDepartureNotification(
-      shift,
-      departureId
-    );
-    const checkInNotificationId = await scheduleCheckInNotification(
-      shift,
-      checkInId
-    );
-    const checkOutNotificationId = await scheduleCheckOutNotification(
-      shift,
-      checkOutId
-    );
+    if (!shift.daysApplied[dayOfWeek]) {
+      console.log(
+        `Hôm nay (thứ ${dayOfWeek}) không nằm trong lịch ca làm việc`
+      );
+      return false;
+    }
 
-    console.log("Scheduled notifications with IDs:", {
-      departure: departureNotificationId,
-      checkIn: checkInNotificationId,
-      checkOut: checkOutNotificationId,
-    });
+    // 4. Tạo ID duy nhất cho mỗi loại thông báo
+    const shiftId = shift.id || "default";
+    const dateStr = today.toISOString().split("T")[0];
+
+    const departureId = `departure-${shiftId}-${dateStr}`;
+    const checkInId = `checkin-${shiftId}-${dateStr}`;
+    const checkOutId = `checkout-${shiftId}-${dateStr}`;
+
+    // 5. Lên lịch các thông báo với ID cố định
+    await scheduleDepartureNotification(shift, departureId);
+    await scheduleCheckInNotification(shift, checkInId);
+    await scheduleCheckOutNotification(shift, checkOutId);
+
+    // 6. Kiểm tra lại sau khi lên lịch
+    await checkScheduledNotifications();
 
     return true;
   } catch (error) {
-    console.error("Error scheduling notifications:", error);
+    console.error("Lỗi khi lên lịch thông báo:", error);
     return false;
   }
 };
@@ -415,34 +417,57 @@ export const scheduleDepartureNotification = async (shift, identifier) => {
   if (!shift) return null;
 
   try {
-    // If the time has already passed in the day, don't schedule the notification
+    // Kiểm tra đã qua thời gian hay chưa
     const now = new Date();
     const [hours, minutes] = shift.departureTime.split(":").map(Number);
-    const triggerTime = new Date();
+    const triggerTime = new Date(now);
     triggerTime.setHours(hours, minutes, 0, 0);
 
+    // Nếu đã qua thời gian xuất phát, không lên lịch
     if (triggerTime <= now) {
-      // Check if today is the day the shift is applied
-      const today = now.getDay();
-      if (shift.daysApplied[today]) {
-        console.log("Departure time already passed for today");
-        return null;
-      }
+      console.log(
+        `Thời gian xuất phát ${hours}:${minutes} đã qua, không lên lịch`
+      );
+      return null;
     }
 
-    // Schedule notification with fixed identifier
-    const alarmId = await scheduleAlarm({
+    // Kiểm tra xem đã có bản ghi chấm công nào chưa
+    const todayStr = now.toISOString().split("T")[0];
+    const goWorkLog = await getAttendanceLogByType(todayStr, "go_work");
+
+    if (goWorkLog) {
+      console.log("Đã có bản ghi 'đi làm', không lên lịch thông báo xuất phát");
+      return null;
+    }
+
+    // Lên lịch với identifier cụ thể
+    console.log(
+      `Lên lịch thông báo xuất phát lúc ${triggerTime.toLocaleTimeString()} với ID: ${identifier}`
+    );
+
+    const content = {
       title: "Đến giờ đi làm",
       body: `Đã đến giờ xuất phát đi làm cho ca ${shift.name}`,
-      triggerTime,
-      type: "departure",
-      data: { shiftId: shift.id },
-      identifier, // Pass identifier
+      sound: "default",
+      priority: "high",
+      data: {
+        type: "departure",
+        alarmType: "attendo_alarm",
+        shiftId: shift.id,
+      },
+    };
+
+    const trigger = { date: triggerTime };
+
+    const alarmId = await Notifications.scheduleNotificationAsync({
+      content,
+      trigger,
+      identifier, // Sử dụng identifier để tránh trùng lặp
     });
 
     return alarmId;
   } catch (error) {
-    console.error("Error scheduling departure notification:", error);
+    console.error("Lỗi khi lên lịch thông báo xuất phát:", error);
     return null;
   }
 };
@@ -532,3 +557,196 @@ export const scheduleCheckOutNotification = async (shift, identifier) => {
     return null;
   }
 };
+
+// Thêm nút debug vào giao diện khi đang phát triển
+const debugAppState = () => {
+  const appState = {
+    currentShift,
+    multiButtonMode,
+    currentAction,
+    todayLogs,
+    // Thêm các trạng thái khác nếu cần
+  };
+
+  console.log("Trạng thái app hiện tại:", JSON.stringify(appState, null, 2));
+  Alert.alert("Trạng thái App", JSON.stringify(appState, null, 2));
+};
+
+// Thêm nút debug vào giao diện
+{
+  __DEV__ && (
+    <TouchableOpacity style={styles.debugButton} onPress={debugAppState}>
+      <Text style={styles.debugButtonText}>Debug</Text>
+    </TouchableOpacity>
+  );
+}
+
+const performAction = async (force = false, overrideAction = null) => {
+  console.log("performAction được gọi với params:", { force, overrideAction });
+
+  try {
+    const actionToPerform = overrideAction || currentAction;
+    console.log("Hành động sẽ thực hiện:", actionToPerform);
+
+    // Kiểm tra dữ liệu trước khi thực hiện
+    if (!currentShift) {
+      console.error("Lỗi: không có ca làm việc hiện tại");
+      return { success: false, message: "Không có ca làm việc" };
+    }
+
+    // Log các thông tin quan trọng
+    console.log("Thông tin ca làm việc:", {
+      name: currentShift.name,
+      startTime: currentShift.startTime,
+      endTime: currentShift.endTime,
+      daysApplied: currentShift.daysApplied,
+    });
+
+    const result = await addAttendanceLog(actionToPerform, force);
+    console.log("Kết quả addAttendanceLog:", result);
+
+    // Phần code còn lại...
+
+    return result;
+  } catch (error) {
+    console.error("Lỗi trong performAction:", error);
+    console.error("Stack:", error.stack);
+    return { success: false, message: error.message };
+  }
+};
+
+// Thêm vào AppContext.js hoặc nơi khởi động app
+const cleanupNotifications = async () => {
+  try {
+    console.log("Kiểm tra và dọn dẹp thông báo...");
+
+    // Lấy danh sách thông báo hiện tại
+    const notifications =
+      await Notifications.getAllScheduledNotificationsAsync();
+
+    // Tìm các thông báo trùng lặp
+    const seenIdentifiers = new Set();
+    const duplicates = [];
+
+    notifications.forEach((notification) => {
+      const type = notification.content?.data?.type;
+      if (!type) return;
+
+      const key = `${type}-${notification.trigger?.date}`;
+      if (seenIdentifiers.has(key)) {
+        duplicates.push(notification.identifier);
+      } else {
+        seenIdentifiers.add(key);
+      }
+    });
+
+    // Xóa các thông báo trùng lặp
+    if (duplicates.length > 0) {
+      console.log(
+        `Tìm thấy ${duplicates.length} thông báo trùng lặp, đang xóa...`
+      );
+      for (const id of duplicates) {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      }
+    }
+
+    console.log("Hoàn tất dọn dẹp thông báo");
+  } catch (error) {
+    console.error("Lỗi khi dọn dẹp thông báo:", error);
+  }
+};
+
+// Thêm nút debug trong SettingsScreen.js hoặc một màn hình phù hợp
+const DebugAlarmSection = () => {
+  const checkAlarms = async () => {
+    const notifications =
+      await Notifications.getAllScheduledNotificationsAsync();
+
+    // Thông tin chi tiết hơn
+    const alarmsInfo = notifications.map((notif) => ({
+      id: notif.identifier,
+      title: notif.content.title,
+      triggerAt: notif.trigger.date
+        ? new Date(notif.trigger.date).toLocaleString()
+        : "N/A",
+      type: notif.content.data?.type || "unknown",
+    }));
+
+    // Hiển thị kết quả
+    Alert.alert(
+      "Thông báo đã lên lịch",
+      `Tổng số: ${notifications.length}\n\n${JSON.stringify(
+        alarmsInfo,
+        null,
+        2
+      )}`
+    );
+  };
+
+  const clearAllAlarms = async () => {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    Alert.alert("Thành công", "Đã xóa tất cả thông báo đã lên lịch");
+  };
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Debug Thông Báo</Text>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.debugButton} onPress={checkAlarms}>
+          <Text style={styles.buttonText}>Kiểm tra thông báo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.debugButton, { backgroundColor: "red" }]}
+          onPress={clearAllAlarms}
+        >
+          <Text style={[styles.buttonText, { color: "white" }]}>
+            Xóa tất cả thông báo
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+// Thêm vào SettingsScreen
+{
+  __DEV__ && <DebugAlarmSection />;
+}
+
+// Thêm hàm kiểm tra và hiển thị các thông báo đã lên lịch
+export const checkScheduledNotifications = async () => {
+  try {
+    const notifications =
+      await Notifications.getAllScheduledNotificationsAsync();
+    console.log(`Có ${notifications.length} thông báo đã lên lịch:`);
+
+    // Nhóm các thông báo theo loại để dễ kiểm tra
+    const byType = {};
+    notifications.forEach((notification) => {
+      const type = notification.content?.data?.type || "unknown";
+      if (!byType[type]) byType[type] = [];
+      byType[type].push({
+        id: notification.identifier,
+        title: notification.content.title,
+        trigger: notification.trigger,
+      });
+    });
+
+    console.log("Thông báo theo loại:", JSON.stringify(byType, null, 2));
+    return notifications;
+  } catch (error) {
+    console.error("Lỗi khi kiểm tra thông báo:", error);
+    return [];
+  }
+};
+
+// Thêm vào app startup để kiểm tra
+useEffect(() => {
+  // Thêm vào AppContext.js trong loadData
+  const checkNotifications = async () => {
+    const notifications = await checkScheduledNotifications();
+    console.log(`Tổng số thông báo đã lên lịch: ${notifications.length}`);
+  };
+
+  checkNotifications();
+}, []);
