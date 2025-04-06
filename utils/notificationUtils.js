@@ -1,27 +1,32 @@
-import * as Notifications from "expo-notifications"
-import * as BackgroundFetch from "expo-background-fetch"
-import * as TaskManager from "expo-task-manager"
-import { getActiveShift, getAttendanceLogByType, getNotes, getShiftById } from "./database"
-import { formatDate } from "./dateUtils"
+import * as Notifications from "expo-notifications";
+import * as BackgroundFetch from "expo-background-fetch";
+import * as TaskManager from "expo-task-manager";
+import {
+  getActiveShift,
+  getAttendanceLogByType,
+  getNotes,
+  getShiftById,
+} from "./database";
+import { formatDate } from "./dateUtils";
 import {
   scheduleAlarm,
   cancelAlarmsByType,
   cancelAllAlarms,
   initializeAlarmSystem,
   triggerAlarmNow,
-} from "./alarmUtils"
+} from "./alarmUtils";
 
 // Định nghĩa task name cho background fetch
-const BACKGROUND_NOTIFICATION_TASK = "BACKGROUND_NOTIFICATION_TASK"
+const BACKGROUND_NOTIFICATION_TASK = "BACKGROUND_NOTIFICATION_TASK";
 
 // Cấu hình notifications
 export const configureNotifications = async () => {
   try {
     // Yêu cầu quyền
-    const { status } = await Notifications.requestPermissionsAsync()
+    const { status } = await Notifications.requestPermissionsAsync();
     if (status !== "granted") {
-      console.log("Notification permissions not granted")
-      return false
+      console.log("Notification permissions not granted");
+      return false;
     }
 
     // Cấu hình cách thông báo xuất hiện khi ứng dụng ở foreground
@@ -31,92 +36,119 @@ export const configureNotifications = async () => {
         shouldPlaySound: true,
         shouldSetBadge: true,
       }),
-    })
+    });
 
     // Khởi tạo hệ thống báo thức
-    await initializeAlarmSystem()
+    await initializeAlarmSystem();
 
     // Đăng ký background task
-    await registerBackgroundNotificationTask()
+    await registerBackgroundNotificationTask();
 
-    return true
+    return true;
   } catch (error) {
-    console.error("Error configuring notifications:", error)
-    return false
+    console.error("Error configuring notifications:", error);
+    return false;
   }
-}
+};
 
 // Đăng ký background task
 const registerBackgroundNotificationTask = async () => {
   try {
     // Kiểm tra xem task đã được đăng ký chưa
-    const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_NOTIFICATION_TASK)
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(
+      BACKGROUND_NOTIFICATION_TASK
+    );
 
     if (!isRegistered) {
       // Định nghĩa task
       TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
         try {
           // Kiểm tra và lên lịch thông báo
-          const result = await scheduleNotificationsForActiveShift()
-          return result ? BackgroundFetch.BackgroundFetchResult.NewData : BackgroundFetch.BackgroundFetchResult.NoData
+          const result = await scheduleNotificationsForActiveShift();
+          return result
+            ? BackgroundFetch.BackgroundFetchResult.NewData
+            : BackgroundFetch.BackgroundFetchResult.NoData;
         } catch (error) {
-          console.error("Error in background task:", error)
-          return BackgroundFetch.BackgroundFetchResult.Failed
+          console.error("Error in background task:", error);
+          return BackgroundFetch.BackgroundFetchResult.Failed;
         }
-      })
+      });
 
       // Đăng ký background fetch
       await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
         minimumInterval: 15 * 60, // 15 phút
         stopOnTerminate: false,
         startOnBoot: true,
-      })
+      });
     }
   } catch (error) {
-    console.error("Error registering background task:", error)
+    console.error("Error registering background task:", error);
   }
-}
+};
 
 // Lên lịch báo thức xuất phát
 export const scheduleDepartureNotification = async (shift) => {
-  if (!shift) return null
+  if (!shift) return null;
 
   try {
     // Hủy thông báo xuất phát hiện tại
-    await cancelAlarmsByType("departure")
+    await cancelAlarmsByType("departure");
 
     // Lấy ngày hiện tại
-    const today = new Date()
-    const todayString = formatDate(today)
+    const today = new Date();
+    const todayString = formatDate(today);
 
     // Kiểm tra xem người dùng đã bấm "Đi làm" chưa
-    const goWorkLog = await getAttendanceLogByType(todayString, "go_work")
+    const goWorkLog = await getAttendanceLogByType(todayString, "go_work");
     if (goWorkLog) {
-      console.log("User already went to work, not scheduling departure notification")
-      return null
+      console.log(
+        "User already went to work, not scheduling departure notification"
+      );
+      return null;
     }
 
     // Phân tích thời gian xuất phát
-    const [hours, minutes] = shift.departureTime.split(":").map(Number)
+    const [hours, minutes] = shift.departureTime.split(":").map(Number);
 
     // Tạo thời gian kích hoạt thông báo
-    const trigger = new Date()
-    trigger.setHours(hours, minutes, 0, 0)
+    const trigger = new Date();
+    trigger.setHours(hours, minutes, 0, 0);
 
-    // Nếu thời gian đã qua, lên lịch cho ngày mai
-    if (trigger <= new Date()) {
+    // Nếu thời gian đã qua, lên lịch cho ngày mai nhưng CHỈ khi ngày hiện tại đã qua
+    if (trigger <= today) {
+      // Kiểm tra xem ngày hôm nay có phải là ngày áp dụng ca làm việc không
+      const todayDay = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+
+      // Nếu ca làm việc áp dụng cho hôm nay, KHÔNG lên lịch cho ngày mai
+      if (shift.daysApplied[todayDay]) {
+        console.log(
+          `Today is in shift's applied days but time has passed, not scheduling for tomorrow`
+        );
+        return null;
+      }
+
       // Kiểm tra xem ngày mai có phải là ngày áp dụng ca làm việc không
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      const tomorrowDay = tomorrow.getDay() // 0 = Sunday, 1 = Monday, ...
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowDay = tomorrow.getDay(); // 0 = Sunday, 1 = Monday, ...
 
       // Nếu ca làm việc không áp dụng cho ngày mai, không lên lịch
       if (!shift.daysApplied[tomorrowDay]) {
-        console.log(`Tomorrow (day ${tomorrowDay}) is not in shift's applied days, not scheduling`)
-        return null
+        console.log(
+          `Tomorrow (day ${tomorrowDay}) is not in shift's applied days, not scheduling`
+        );
+        return null;
       }
 
-      trigger.setDate(trigger.getDate() + 1)
+      trigger.setDate(trigger.getDate() + 1);
+    }
+
+    // Sử dụng thời gian cố định cho nhắc nhở nếu có
+    if (shift.fixedRemindTime && shift.fixedRemindTime.departure) {
+      const [reminderHours, reminderMinutes] = shift.fixedRemindTime.departure
+        .split(":")
+        .map(Number);
+      trigger.setHours(reminderHours, reminderMinutes, 0, 0);
     }
 
     // Lên lịch báo thức thay vì thông báo thông thường
@@ -126,57 +158,82 @@ export const scheduleDepartureNotification = async (shift) => {
       triggerTime: trigger,
       type: "departure",
       data: { shiftId: shift.id },
-    })
+    });
 
-    console.log(`Scheduled departure alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`)
-    return alarmId
+    console.log(
+      `Scheduled departure alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`
+    );
+    return alarmId;
   } catch (error) {
-    console.error("Error scheduling departure notification:", error)
-    return null
+    console.error("Error scheduling departure notification:", error);
+    return null;
   }
-}
+};
 
 // Lên lịch báo thức chấm công vào
 export const scheduleCheckInNotification = async (shift) => {
-  if (!shift) return null
+  if (!shift) return null;
 
   try {
     // Hủy thông báo chấm công vào hiện tại
-    await cancelAlarmsByType("check-in")
+    await cancelAlarmsByType("check-in");
 
     // Lấy ngày hiện tại
-    const today = new Date()
-    const todayString = formatDate(today)
+    const today = new Date();
+    const todayString = formatDate(today);
 
     // Kiểm tra xem người dùng đã chấm công vào chưa
-    const checkInLog = await getAttendanceLogByType(todayString, "check_in")
+    const checkInLog = await getAttendanceLogByType(todayString, "check_in");
     if (checkInLog) {
-      console.log("User already checked in, not scheduling check-in notification")
-      return null
+      console.log(
+        "User already checked in, not scheduling check-in notification"
+      );
+      return null;
     }
 
     // Phân tích thời gian bắt đầu
-    const [hours, minutes] = shift.startTime.split(":").map(Number)
+    const [hours, minutes] = shift.startTime.split(":").map(Number);
 
     // Tạo thời gian kích hoạt thông báo (startTime - remindBeforeStart)
-    const trigger = new Date()
-    trigger.setHours(hours, minutes, 0, 0)
-    trigger.setMinutes(trigger.getMinutes() - shift.remindBeforeStart)
+    const trigger = new Date();
+    trigger.setHours(hours, minutes, 0, 0);
+    trigger.setMinutes(trigger.getMinutes() - shift.remindBeforeStart);
 
-    // Nếu thời gian đã qua, lên lịch cho ngày mai
-    if (trigger <= new Date()) {
+    // Nếu thời gian đã qua, lên lịch cho ngày mai nhưng CHỈ khi ngày hiện tại đã qua
+    if (trigger <= today) {
+      // Kiểm tra xem ngày hôm nay có phải là ngày áp dụng ca làm việc không
+      const todayDay = today.getDay();
+
+      // Nếu ca làm việc áp dụng cho hôm nay, KHÔNG lên lịch cho ngày mai
+      if (shift.daysApplied[todayDay]) {
+        console.log(
+          `Today is in shift's applied days but check-in time has passed, not scheduling for tomorrow`
+        );
+        return null;
+      }
+
       // Kiểm tra xem ngày mai có phải là ngày áp dụng ca làm việc không
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      const tomorrowDay = tomorrow.getDay() // 0 = Sunday, 1 = Monday, ...
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowDay = tomorrow.getDay(); // 0 = Sunday, 1 = Monday, ...
 
       // Nếu ca làm việc không áp dụng cho ngày mai, không lên lịch
       if (!shift.daysApplied[tomorrowDay]) {
-        console.log(`Tomorrow (day ${tomorrowDay}) is not in shift's applied days, not scheduling`)
-        return null
+        console.log(
+          `Tomorrow (day ${tomorrowDay}) is not in shift's applied days, not scheduling`
+        );
+        return null;
       }
 
-      trigger.setDate(trigger.getDate() + 1)
+      trigger.setDate(trigger.getDate() + 1);
+    }
+
+    // Sử dụng thời gian cố định cho nhắc nhở nếu có
+    if (shift.fixedRemindTime && shift.fixedRemindTime.checkIn) {
+      const [reminderHours, reminderMinutes] = shift.fixedRemindTime.checkIn
+        .split(":")
+        .map(Number);
+      trigger.setHours(reminderHours, reminderMinutes, 0, 0);
     }
 
     // Lên lịch báo thức thay vì thông báo thông thường
@@ -186,56 +243,81 @@ export const scheduleCheckInNotification = async (shift) => {
       triggerTime: trigger,
       type: "check-in",
       data: { shiftId: shift.id },
-    })
+    });
 
-    console.log(`Scheduled check-in alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`)
-    return alarmId
+    console.log(
+      `Scheduled check-in alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`
+    );
+    return alarmId;
   } catch (error) {
-    console.error("Error scheduling check-in notification:", error)
-    return null
+    console.error("Error scheduling check-in notification:", error);
+    return null;
   }
-}
+};
 
 // Lên lịch báo thức chấm công ra
 export const scheduleCheckOutNotification = async (shift) => {
-  if (!shift) return null
+  if (!shift) return null;
 
   try {
     // Hủy thông báo chấm công ra hiện tại
-    await cancelAlarmsByType("check-out")
+    await cancelAlarmsByType("check-out");
 
     // Lấy ngày hiện tại
-    const today = new Date()
-    const todayString = formatDate(today)
+    const today = new Date();
+    const todayString = formatDate(today);
 
     // Kiểm tra xem người dùng đã chấm công ra chưa
-    const checkOutLog = await getAttendanceLogByType(todayString, "check_out")
+    const checkOutLog = await getAttendanceLogByType(todayString, "check_out");
     if (checkOutLog) {
-      console.log("User already checked out, not scheduling check-out notification")
-      return null
+      console.log(
+        "User already checked out, not scheduling check-out notification"
+      );
+      return null;
     }
 
     // Phân tích thời gian kết thúc
-    const [hours, minutes] = shift.endTime.split(":").map(Number)
+    const [hours, minutes] = shift.endTime.split(":").map(Number);
 
     // Tạo thời gian kích hoạt thông báo
-    const trigger = new Date()
-    trigger.setHours(hours, minutes, 0, 0)
+    const trigger = new Date();
+    trigger.setHours(hours, minutes, 0, 0);
 
-    // Nếu thời gian đã qua, lên lịch cho ngày mai
-    if (trigger <= new Date()) {
+    // Nếu thời gian đã qua, lên lịch cho ngày mai nhưng CHỈ khi ngày hiện tại đã qua
+    if (trigger <= today) {
+      // Kiểm tra xem ngày hôm nay có phải là ngày áp dụng ca làm việc không
+      const todayDay = today.getDay();
+
+      // Nếu ca làm việc áp dụng cho hôm nay, KHÔNG lên lịch cho ngày mai
+      if (shift.daysApplied[todayDay]) {
+        console.log(
+          `Today is in shift's applied days but check-out time has passed, not scheduling for tomorrow`
+        );
+        return null;
+      }
+
       // Kiểm tra xem ngày mai có phải là ngày áp dụng ca làm việc không
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      const tomorrowDay = tomorrow.getDay() // 0 = Sunday, 1 = Monday, ...
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowDay = tomorrow.getDay(); // 0 = Sunday, 1 = Monday, ...
 
       // Nếu ca làm việc không áp dụng cho ngày mai, không lên lịch
       if (!shift.daysApplied[tomorrowDay]) {
-        console.log(`Tomorrow (day ${tomorrowDay}) is not in shift's applied days, not scheduling`)
-        return null
+        console.log(
+          `Tomorrow (day ${tomorrowDay}) is not in shift's applied days, not scheduling`
+        );
+        return null;
       }
 
-      trigger.setDate(trigger.getDate() + 1)
+      trigger.setDate(trigger.getDate() + 1);
+    }
+
+    // Sử dụng thời gian cố định cho nhắc nhở nếu có
+    if (shift.fixedRemindTime && shift.fixedRemindTime.checkOut) {
+      const [reminderHours, reminderMinutes] = shift.fixedRemindTime.checkOut
+        .split(":")
+        .map(Number);
+      trigger.setHours(reminderHours, reminderMinutes, 0, 0);
     }
 
     // Lên lịch báo thức thay vì thông báo thông thường
@@ -245,80 +327,98 @@ export const scheduleCheckOutNotification = async (shift) => {
       triggerTime: trigger,
       type: "check-out",
       data: { shiftId: shift.id },
-    })
+    });
 
-    console.log(`Scheduled check-out alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`)
-    return alarmId
+    console.log(
+      `Scheduled check-out alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`
+    );
+    return alarmId;
   } catch (error) {
-    console.error("Error scheduling check-out notification:", error)
-    return null
+    console.error("Error scheduling check-out notification:", error);
+    return null;
   }
-}
+};
 
 // Lên lịch tất cả thông báo cho một ca làm việc
 export const scheduleAllNotifications = async (shift) => {
-  if (!shift) return
+  if (!shift) return;
 
   try {
     // Kiểm tra xem ca làm việc có áp dụng cho hôm nay không
-    const today = new Date().getDay() // 0 = Sunday, 1 = Monday, ...
+    const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, ...
 
     // Chuyển đổi daysApplied thành số ngày
-    let daysApplied = []
+    let daysApplied = [];
     if (Array.isArray(shift.daysApplied)) {
       // Nếu là mảng boolean
       if (typeof shift.daysApplied[0] === "boolean") {
-        daysApplied = shift.daysApplied.map((applied, index) => (applied ? index : null)).filter((day) => day !== null)
+        daysApplied = shift.daysApplied
+          .map((applied, index) => (applied ? index : null))
+          .filter((day) => day !== null);
       }
       // Nếu là mảng string (Sun, Mon, Tue, ...)
       else {
-        const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
-        daysApplied = shift.daysApplied.map((day) => dayMap[day]).filter((day) => day !== undefined)
+        const dayMap = {
+          Sun: 0,
+          Mon: 1,
+          Tue: 2,
+          Wed: 3,
+          Thu: 4,
+          Fri: 5,
+          Sat: 6,
+        };
+        daysApplied = shift.daysApplied
+          .map((day) => dayMap[day])
+          .filter((day) => day !== undefined);
       }
     }
 
     // Nếu hôm nay không nằm trong daysApplied, không lên lịch thông báo
     if (!daysApplied.includes(today)) {
-      console.log(`Today (day ${today}) is not in shift's applied days: ${JSON.stringify(daysApplied)}`)
-      return
+      console.log(
+        `Today (day ${today}) is not in shift's applied days: ${JSON.stringify(
+          daysApplied
+        )}`
+      );
+      return;
     }
 
     // Lên lịch tất cả thông báo
-    const departureId = await scheduleDepartureNotification(shift)
-    const checkInId = await scheduleCheckInNotification(shift)
-    const checkOutId = await scheduleCheckOutNotification(shift)
+    const departureId = await scheduleDepartureNotification(shift);
+    const checkInId = await scheduleCheckInNotification(shift);
+    const checkOutId = await scheduleCheckOutNotification(shift);
 
     // Lên lịch thông báo cho các ghi chú liên quan đến ca làm việc này
-    await scheduleNoteNotifications(shift.id)
+    await scheduleNoteNotifications(shift.id);
 
     return {
       departureId,
       checkInId,
       checkOutId,
-    }
+    };
   } catch (error) {
-    console.error("Error scheduling all notifications:", error)
-    return null
+    console.error("Error scheduling all notifications:", error);
+    return null;
   }
-}
+};
 
 // Lên lịch thông báo cho các ghi chú
 export const scheduleNoteNotifications = async (shiftId = null) => {
   try {
     // Lấy tất cả ghi chú
-    const notes = await getNotes()
-    if (!notes || notes.length === 0) return []
+    const notes = await getNotes();
+    if (!notes || notes.length === 0) return [];
 
     // Lấy ngày hiện tại và ngày trong tuần
-    const today = new Date()
-    const dayOfWeek = today.toLocaleString("en-US", { weekday: "short" }) // 'Sun', 'Mon', etc.
-    const todayDay = today.getDay() // 0 = Sunday, 1 = Monday, ...
+    const today = new Date();
+    const dayOfWeek = today.toLocaleString("en-US", { weekday: "short" }); // 'Sun', 'Mon', etc.
+    const todayDay = today.getDay(); // 0 = Sunday, 1 = Monday, ...
 
     // Lọc ghi chú cần thông báo
-    const notesToNotify = []
+    const notesToNotify = [];
 
     for (const note of notes) {
-      let shouldNotify = false
+      let shouldNotify = false;
 
       // Trường hợp 1: Ghi chú liên kết với ca làm việc cụ thể
       if (note.associatedShiftIds && note.associatedShiftIds.length > 0) {
@@ -326,18 +426,18 @@ export const scheduleNoteNotifications = async (shiftId = null) => {
         if (!shiftId) {
           // Kiểm tra từng ca liên kết
           for (const id of note.associatedShiftIds) {
-            const shift = await getShiftById(id)
+            const shift = await getShiftById(id);
             if (shift && shift.daysApplied && shift.daysApplied[todayDay]) {
-              shouldNotify = true
-              break
+              shouldNotify = true;
+              break;
             }
           }
         }
         // Nếu có shiftId được chỉ định, chỉ kiểm tra ca đó
         else if (note.associatedShiftIds.includes(shiftId)) {
-          const shift = await getShiftById(shiftId)
+          const shift = await getShiftById(shiftId);
           if (shift && shift.daysApplied && shift.daysApplied[todayDay]) {
-            shouldNotify = true
+            shouldNotify = true;
           }
         }
       }
@@ -347,30 +447,30 @@ export const scheduleNoteNotifications = async (shiftId = null) => {
         note.explicitReminderDays &&
         note.explicitReminderDays.includes(dayOfWeek)
       ) {
-        shouldNotify = true
+        shouldNotify = true;
       }
 
       if (shouldNotify) {
-        notesToNotify.push(note)
+        notesToNotify.push(note);
       }
     }
 
     // Lên lịch thông báo cho các ghi chú đã lọc
-    const notificationIds = []
+    const notificationIds = [];
 
     for (const note of notesToNotify) {
       // Phân tích thời gian nhắc nhở
-      const reminderDate = new Date(note.reminderTime)
-      const hours = reminderDate.getHours()
-      const minutes = reminderDate.getMinutes()
+      const reminderDate = new Date(note.reminderTime);
+      const hours = reminderDate.getHours();
+      const minutes = reminderDate.getMinutes();
 
       // Tạo thời gian kích hoạt thông báo
-      const trigger = new Date()
-      trigger.setHours(hours, minutes, 0, 0)
+      const trigger = new Date();
+      trigger.setHours(hours, minutes, 0, 0);
 
       // Nếu thời gian đã qua, không lên lịch
       if (trigger <= new Date()) {
-        continue
+        continue;
       }
 
       // Lên lịch báo thức với ưu tiên cao
@@ -380,67 +480,69 @@ export const scheduleNoteNotifications = async (shiftId = null) => {
         triggerTime: trigger,
         type: "note",
         data: { noteId: note.id },
-      })
+      });
 
-      console.log(`Scheduled note alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`)
-      notificationIds.push(alarmId)
+      console.log(
+        `Scheduled note alarm for ${trigger.toLocaleString()}, ID: ${alarmId}`
+      );
+      notificationIds.push(alarmId);
     }
 
-    return notificationIds
+    return notificationIds;
   } catch (error) {
-    console.error("Error scheduling note notifications:", error)
-    return []
+    console.error("Error scheduling note notifications:", error);
+    return [];
   }
-}
+};
 
 // Hủy thông báo theo loại
 export const cancelNotificationsByType = async (type) => {
   try {
-    return await cancelAlarmsByType(type)
+    return await cancelAlarmsByType(type);
   } catch (error) {
-    console.error(`Error canceling ${type} notifications:`, error)
-    return false
+    console.error(`Error canceling ${type} notifications:`, error);
+    return false;
   }
-}
+};
 
 // Hủy tất cả thông báo
 export const cancelAllNotifications = async () => {
   try {
-    return await cancelAllAlarms()
+    return await cancelAllAlarms();
   } catch (error) {
-    console.error("Error canceling all notifications:", error)
-    return false
+    console.error("Error canceling all notifications:", error);
+    return false;
   }
-}
+};
 
 // Lên lịch thông báo dựa trên ca làm việc hiện tại
 export const scheduleNotificationsForActiveShift = async () => {
   try {
     // Lấy ca làm việc hiện tại
-    const activeShift = await getActiveShift()
+    const activeShift = await getActiveShift();
     if (!activeShift) {
-      console.log("No active shift found, not scheduling notifications")
-      return false
+      console.log("No active shift found, not scheduling notifications");
+      return false;
     }
 
     // Lên lịch thông báo
-    const result = await scheduleAllNotifications(activeShift)
-    return !!result
+    const result = await scheduleAllNotifications(activeShift);
+    return !!result;
   } catch (error) {
-    console.error("Error scheduling notifications for active shift:", error)
-    return false
+    console.error("Error scheduling notifications for active shift:", error);
+    return false;
   }
-}
+};
 
 // Xử lý thông báo khi nhận được
 export const handleReceivedNotification = async (notification) => {
   try {
-    const { type, shiftId, noteId } = notification.request.content.data || {}
+    const { type, shiftId, noteId } = notification.request.content.data || {};
 
-    if (!type) return
+    if (!type) return;
 
     // Ghi log thông báo đã nhận
-    console.log(`Received notification of type: ${type}`)
+    console.log(`Received notification of type: ${type}`);
 
     // Kích hoạt báo thức ngay lập tức nếu là thông báo quan trọng
     if (type === "departure" || type === "check-in" || type === "check-out") {
@@ -449,35 +551,37 @@ export const handleReceivedNotification = async (notification) => {
         body: notification.request.content.body,
         type,
         data: { shiftId, noteId },
-      })
+      });
     }
 
-    return true
+    return true;
   } catch (error) {
-    console.error("Error handling received notification:", error)
-    return false
+    console.error("Error handling received notification:", error);
+    return false;
   }
-}
+};
 
 // Thiết lập listener cho thông báo
 export const setupNotificationListeners = () => {
   // Listener cho thông báo khi ứng dụng đang chạy
-  const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
-    handleReceivedNotification(notification)
-  })
+  const foregroundSubscription = Notifications.addNotificationReceivedListener(
+    (notification) => {
+      handleReceivedNotification(notification);
+    }
+  );
 
   // Listener cho thông báo khi người dùng tương tác
-  const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-    const { type } = response.notification.request.content.data || {}
-    console.log(`User interacted with notification of type: ${type}`)
-  })
+  const responseSubscription =
+    Notifications.addNotificationResponseReceivedListener((response) => {
+      const { type } = response.notification.request.content.data || {};
+      console.log(`User interacted with notification of type: ${type}`);
+    });
 
   // Trả về hàm cleanup
   return {
     removeNotificationListeners: () => {
-      foregroundSubscription.remove()
-      responseSubscription.remove()
+      foregroundSubscription.remove();
+      responseSubscription.remove();
     },
-  }
-}
-
+  };
+};
