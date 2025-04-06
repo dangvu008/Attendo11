@@ -774,3 +774,7 @@ export const getLastBackupTime = async () => {
   }
 }
 
+// Export validateTimeInterval and updateWorkStatusForNewLog
+export { validateTimeInterval } from "./timeRules"
+export { updateWorkStatusForNewLog } from "./workStatusUtils"
+

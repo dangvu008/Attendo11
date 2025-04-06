@@ -15,11 +15,17 @@ import {
   getNotes,
   createDataBackup,
   updateDailyWorkStatus,
+  getAttendanceLogByType,
+  addAttendanceLog as addAttendanceLogDB,
+  validateTimeInterval,
+  updateWorkStatusForNewLog,
 } from "../utils/database"
 import {
   configureNotifications,
   scheduleNotificationsForActiveShift,
   setupNotificationListeners,
+  cancelNotificationsByType,
+  cancelAllNotifications,
 } from "../utils/notificationUtils"
 import { initializeAlarmSystem } from "../utils/alarmUtils"
 import { checkIfResetNeeded } from "../utils/workStatusUtils"
@@ -216,6 +222,105 @@ export const AppProvider = ({ children }) => {
     }
   }
 
+  // Add a new attendance log
+  const handleAddAttendanceLog = async (logType, force = false) => {
+    try {
+      console.log("Starting handleAddAttendanceLog with logType:", logType, "force:", force)
+      const today = new Date().toISOString().split("T")[0]
+
+      // If not forcing the action, validate time rules
+      if (!force) {
+        let previousActionType = null
+        let previousActionTime = null
+
+        if (logType === "go_work") {
+          const goWorkLog = await getAttendanceLogByType(today, "go_work")
+          if (goWorkLog) {
+            previousActionType = "go_work"
+            previousActionTime = goWorkLog.timestamp
+          }
+        } else if (logType === "check_out") {
+          const checkInLog = await getAttendanceLogByType(today, "check_in")
+          if (checkInLog) {
+            previousActionType = "check_in"
+            previousActionTime = checkInLog.timestamp
+          }
+        }
+
+        // Validate time interval
+        if (typeof validateTimeInterval === "function") {
+          const validation = validateTimeInterval(previousActionType, previousActionTime, logType)
+          if (!validation.isValid && !force) {
+            return {
+              success: false,
+              message: validation.message,
+              needsConfirmation: true,
+            }
+          }
+        } else {
+          console.warn("validateTimeInterval function not available")
+        }
+      }
+
+      // Add the attendance log
+      console.log("Adding attendance log for date:", today, "type:", logType)
+      const newLog = await addAttendanceLogDB(today, logType)
+
+      if (newLog) {
+        console.log("Successfully added log:", newLog)
+        // Update local state
+        setTodayLogs([...todayLogs, newLog])
+
+        // Update work status based on the new log
+        try {
+          if (typeof updateWorkStatusForNewLog === "function") {
+            const updatedStatus = await updateWorkStatusForNewLog(today, logType)
+            if (updatedStatus) {
+              setWorkStatus(updatedStatus)
+            }
+          } else {
+            console.warn("updateWorkStatusForNewLog function not available")
+          }
+        } catch (statusError) {
+          console.error("Error updating work status:", statusError)
+          // Continue even if status update fails
+        }
+
+        // Cancel corresponding notification
+        try {
+          if (logType === "go_work") {
+            await cancelNotificationsByType("departure")
+          } else if (logType === "check_in") {
+            await cancelNotificationsByType("check-in")
+          } else if (logType === "check_out") {
+            await cancelNotificationsByType("check-out")
+          } else if (logType === "complete") {
+            // Cancel all notifications when complete
+            await cancelAllNotifications()
+
+            // Reschedule notifications for next day
+            if (currentShift) {
+              await scheduleNotificationsForActiveShift()
+            }
+          }
+        } catch (notificationError) {
+          console.error("Error handling notifications:", notificationError)
+          // Continue even if notification handling fails
+        }
+
+        return { success: true, log: newLog }
+      }
+
+      console.error("Failed to add attendance log - newLog is null or undefined")
+      return { success: false, message: "Failed to add attendance log" }
+    } catch (error) {
+      console.error("Error in handleAddAttendanceLog:", error)
+      console.error("Error details:", error.message)
+      console.error("Error stack:", error.stack)
+      return { success: false, message: error.message }
+    }
+  }
+
   // Context value
   const contextValue = {
     darkMode,
@@ -254,6 +359,7 @@ export const AppProvider = ({ children }) => {
     weeklyStatusRefreshTrigger,
     refreshWeeklyStatus: () => setWeeklyStatusRefreshTrigger((prev) => prev + 1),
     resetTodayLogs: handleResetTodayLogs,
+    addAttendanceLog: handleAddAttendanceLog,
   }
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>

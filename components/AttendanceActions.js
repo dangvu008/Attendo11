@@ -73,6 +73,19 @@ const AttendanceActions = ({ darkMode }) => {
   // Handle action button press
   const handleActionPress = async () => {
     try {
+      console.log("Starting handleActionPress with currentAction:", currentAction)
+
+      // Check if currentShift exists before proceeding
+      if (!currentShift) {
+        console.log("No active shift found, cannot proceed")
+        Alert.alert(
+          t("no_active_shift") || "No Active Shift",
+          t("no_active_shift_message") || "You don't have an active shift assigned. Please set up a shift first.",
+          [{ text: t("ok") || "OK", style: "default" }],
+        )
+        return
+      }
+
       // If action is already completed, show message
       if (currentAction === "complete" && todayLogs.find((log) => log.type === "complete")) {
         Alert.alert(
@@ -104,6 +117,13 @@ const AttendanceActions = ({ darkMode }) => {
         return
       }
 
+      // Validate multi-button mode is properly set
+      if (typeof multiButtonMode !== "boolean") {
+        console.log("multiButtonMode is not properly set:", multiButtonMode)
+        // Default to true if undefined
+        setMultiButtonMode(true)
+      }
+
       // Check if we have an active shift
       if (!currentShift && (currentAction === "check_in" || currentAction === "check_out")) {
         Alert.alert(
@@ -117,18 +137,26 @@ const AttendanceActions = ({ darkMode }) => {
       // Validate check-in time against shift
       if (currentAction === "check_in" && currentShift) {
         const now = new Date()
-        const validation = validateCheckInTime(now, currentShift)
+        console.log("Validating check-in time:", now, "against shift:", currentShift.name)
 
-        if (!validation.isValid) {
-          Alert.alert(t("invalid_check_in_time") || "Invalid Check-in Time", validation.message, [
-            { text: t("cancel") || "Cancel", style: "cancel" },
-            {
-              text: t("check_in_anyway") || "Check In Anyway",
-              style: "destructive",
-              onPress: () => performAction(true),
-            },
-          ])
-          return
+        // Make sure validateCheckInTime is available
+        if (typeof validateCheckInTime !== "function") {
+          console.error("validateCheckInTime is not a function")
+          // Continue without validation
+        } else {
+          const validation = validateCheckInTime(now, currentShift)
+
+          if (!validation.isValid) {
+            Alert.alert(t("invalid_check_in_time") || "Invalid Check-in Time", validation.message, [
+              { text: t("cancel") || "Cancel", style: "cancel" },
+              {
+                text: t("check_in_anyway") || "Check In Anyway",
+                style: "destructive",
+                onPress: () => performAction(true),
+              },
+            ])
+            return
+          }
         }
       }
 
@@ -138,18 +166,26 @@ const AttendanceActions = ({ darkMode }) => {
         if (checkInLog) {
           const checkInTime = new Date(checkInLog.timestamp)
           const now = new Date()
-          const validation = validateCheckOutTime(now, checkInTime, currentShift)
+          console.log("Validating check-out time:", now, "against check-in time:", checkInTime)
 
-          if (!validation.isValid) {
-            Alert.alert(t("invalid_check_out_time") || "Invalid Check-out Time", validation.message, [
-              { text: t("cancel") || "Cancel", style: "cancel" },
-              {
-                text: t("check_out_anyway") || "Check Out Anyway",
-                style: "destructive",
-                onPress: () => performAction(true),
-              },
-            ])
-            return
+          // Make sure validateCheckOutTime is available
+          if (typeof validateCheckOutTime !== "function") {
+            console.error("validateCheckOutTime is not a function")
+            // Continue without validation
+          } else {
+            const validation = validateCheckOutTime(now, checkInTime, currentShift)
+
+            if (!validation.isValid) {
+              Alert.alert(t("invalid_check_out_time") || "Invalid Check-out Time", validation.message, [
+                { text: t("cancel") || "Cancel", style: "cancel" },
+                {
+                  text: t("check_out_anyway") || "Check Out Anyway",
+                  style: "destructive",
+                  onPress: () => performAction(true),
+                },
+              ])
+              return
+            }
           }
         }
       }
@@ -173,59 +209,78 @@ const AttendanceActions = ({ darkMode }) => {
       }
 
       // Validate time interval
-      const validation = validateTimeInterval(previousActionType, previousActionTime, currentAction)
-
-      if (!validation.isValid) {
-        // Parse message to get translation key and parameters
-        let messageKey = validation.message
-        let params = {}
-
-        if (validation.message && validation.message.includes("|")) {
-          const [key, value] = validation.message.split("|")
-          messageKey = key
-
-          // Check which parameter to use based on the key
-          if (key === "time_rule_violation_message_check_in") {
-            params = { seconds: value }
-          } else if (key === "time_rule_violation_message_check_out") {
-            params = { minutes: value }
-          }
-        }
-
-        // Format the message with parameters
-        let formattedMessage = t(messageKey) || validation.message
-        if (params.seconds) {
-          formattedMessage = formattedMessage.replace("{seconds}", params.seconds)
-        }
-        if (params.minutes) {
-          formattedMessage = formattedMessage.replace("{minutes}", params.minutes)
-        }
-
-        // Show confirmation dialog if time rule is violated
-        Alert.alert(t("time_rule_violation") || "Time Rule Violation", formattedMessage, [
-          {
-            text: t("cancel") || "Cancel",
-            style: "cancel",
-          },
-          {
-            text: t("proceed_anyway") || "Proceed Anyway",
-            style: "destructive",
-            onPress: () => performAction(true),
-          },
-        ])
+      // Make sure validateTimeInterval is available
+      if (typeof validateTimeInterval !== "function") {
+        console.error("validateTimeInterval is not a function")
+        // Continue without validation
       } else {
-        // Proceed with action if time rule is not violated
-        performAction()
+        const validation = validateTimeInterval(previousActionType, previousActionTime, currentAction)
+
+        if (!validation.isValid) {
+          // Parse message to get translation key and parameters
+          let messageKey = validation.message
+          let params = {}
+
+          if (validation.message && validation.message.includes("|")) {
+            const [key, value] = validation.message.split("|")
+            messageKey = key
+
+            // Check which parameter to use based on the key
+            if (key === "time_rule_violation_message_check_in") {
+              params = { seconds: value }
+            } else if (key === "time_rule_violation_message_check_out") {
+              params = { minutes: value }
+            }
+          }
+
+          // Format the message with parameters
+          let formattedMessage = t(messageKey) || validation.message
+          if (params.seconds) {
+            formattedMessage = formattedMessage.replace("{seconds}", params.seconds)
+          }
+          if (params.minutes) {
+            formattedMessage = formattedMessage.replace("{minutes}", params.minutes)
+          }
+
+          // Show confirmation dialog if time rule is violated
+          Alert.alert(t("time_rule_violation") || "Time Rule Violation", formattedMessage, [
+            {
+              text: t("cancel") || "Cancel",
+              style: "cancel",
+            },
+            {
+              text: t("proceed_anyway") || "Proceed Anyway",
+              style: "destructive",
+              onPress: () => performAction(true),
+            },
+          ])
+          return
+        }
       }
+
+      // Proceed with action if time rule is not violated
+      await performAction()
     } catch (error) {
       console.error("Error in handleActionPress:", error)
-      Alert.alert(t("error") || "Error", t("unexpected_error") || "An unexpected error occurred. Please try again.")
+      console.error("Error details:", error.message)
+      console.error("Error stack:", error.stack)
+      console.error("Current action:", currentAction)
+      console.error("Current shift:", currentShift ? currentShift.name : "No shift")
+      console.error("Today's logs:", JSON.stringify(todayLogs))
+
+      Alert.alert(
+        t("error") || "Error",
+        `${t("unexpected_error") || "An unexpected error occurred"}: ${error.message}`,
+        [{ text: t("ok") || "OK", style: "default" }],
+      )
     }
   }
 
   // Perform the action (add attendance log)
   const performAction = async (force = false, overrideAction = null) => {
     try {
+      console.log("Starting performAction with force:", force, "overrideAction:", overrideAction)
+
       // Check if we have the necessary data
       if (!currentShift) {
         console.error("Cannot perform action: No active shift")
@@ -240,6 +295,8 @@ const AttendanceActions = ({ darkMode }) => {
       const today = new Date().toISOString().split("T")[0]
       const actionToPerform = overrideAction || currentAction
 
+      console.log("Performing action:", actionToPerform, "for date:", today)
+
       // Make sure addAttendanceLog is available
       if (typeof addAttendanceLog !== "function") {
         console.error("addAttendanceLog is not a function")
@@ -247,15 +304,27 @@ const AttendanceActions = ({ darkMode }) => {
       }
 
       const result = await addAttendanceLog(actionToPerform, force)
+      console.log("addAttendanceLog result:", result)
 
       if (result.success) {
         // Hủy thông báo tương ứng
-        if (actionToPerform === "go_work") {
-          await cancelNotificationsByType("departure")
-        } else if (actionToPerform === "check_in") {
-          await cancelNotificationsByType("check-in")
-        } else if (actionToPerform === "check_out") {
-          await cancelNotificationsByType("check-out")
+        try {
+          if (actionToPerform === "go_work") {
+            if (typeof cancelNotificationsByType === "function") {
+              await cancelNotificationsByType("departure")
+            }
+          } else if (actionToPerform === "check_in") {
+            if (typeof cancelNotificationsByType === "function") {
+              await cancelNotificationsByType("check-in")
+            }
+          } else if (actionToPerform === "check_out") {
+            if (typeof cancelNotificationsByType === "function") {
+              await cancelNotificationsByType("check-out")
+            }
+          }
+        } catch (notificationError) {
+          console.error("Error canceling notifications:", notificationError)
+          // Continue execution even if notification cancellation fails
         }
 
         // If this is a check-out action, calculate work hours
@@ -266,25 +335,32 @@ const AttendanceActions = ({ darkMode }) => {
             const checkOutTime = new Date()
 
             // Calculate work hours
-            const { regularHours, overtimeHours } = calculateWorkHours(checkInTime, checkOutTime, currentShift)
+            try {
+              if (typeof calculateWorkHours === "function") {
+                const { regularHours, overtimeHours } = calculateWorkHours(checkInTime, checkOutTime, currentShift)
 
-            // Update work status with calculated hours
-            const workStatus = {
-              status: overtimeHours > 0 ? "OT" : "Đủ công",
-              totalWorkTime: regularHours,
-              overtime: overtimeHours,
-              remarks:
-                overtimeHours > 0
-                  ? `Làm việc ${regularHours.toFixed(1)} giờ thông thường và ${overtimeHours.toFixed(1)} giờ tăng ca`
-                  : `Làm việc ${regularHours.toFixed(1)} giờ thông thường`,
-            }
+                // Update work status with calculated hours
+                const workStatus = {
+                  status: overtimeHours > 0 ? "OT" : "Đủ công",
+                  totalWorkTime: regularHours,
+                  overtime: overtimeHours,
+                  remarks:
+                    overtimeHours > 0
+                      ? `Làm việc ${regularHours.toFixed(1)} giờ thông thường và ${overtimeHours.toFixed(1)} giờ tăng ca`
+                      : `Làm việc ${regularHours.toFixed(1)} giờ thông thường`,
+                }
 
-            // Update daily work status
-            if (typeof updateDailyWorkStatus === "function") {
-              await updateDailyWorkStatus(today, workStatus)
-              if (typeof refreshWeeklyStatus === "function") {
-                refreshWeeklyStatus()
+                // Update daily work status
+                if (typeof updateDailyWorkStatus === "function") {
+                  await updateDailyWorkStatus(today, workStatus)
+                  if (typeof refreshWeeklyStatus === "function") {
+                    refreshWeeklyStatus()
+                  }
+                }
               }
+            } catch (calcError) {
+              console.error("Error calculating work hours:", calcError)
+              // Continue execution even if work hour calculation fails
             }
           }
         }
@@ -320,7 +396,15 @@ const AttendanceActions = ({ darkMode }) => {
       }
     } catch (error) {
       console.error("Error performing action:", error)
-      Alert.alert(t("error") || "Error", t("unexpected_error") || "An unexpected error occurred. Please try again.")
+      console.error("Error details:", error.message)
+      console.error("Error stack:", error.stack)
+      console.error("Action to perform:", overrideAction || currentAction)
+
+      Alert.alert(
+        t("error") || "Error",
+        `${t("unexpected_error") || "An unexpected error occurred"}: ${error.message}`,
+        [{ text: t("ok") || "OK", style: "default" }],
+      )
       return { success: false, message: error.message }
     }
   }
