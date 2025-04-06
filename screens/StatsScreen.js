@@ -139,7 +139,7 @@ export default function StatsScreen({ navigation }) {
       console.error("Error loading monthly stats:", error);
       setIsLoading(false);
     }
-  }, [currentMonth, currentShift, monthDays]);
+  }, [currentShift, monthDays]);
 
   useEffect(() => {
     loadMonthlyStats();

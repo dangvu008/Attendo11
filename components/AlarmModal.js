@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useCallback } from "react";
 import { getTranslation } from "../utils/translations";
 import {
   initializeDatabase,
@@ -78,7 +78,7 @@ const AlarmModal = ({
     try {
       // Tạo âm thanh từ tệp mặc định (sử dụng địa chỉ tương đối của tệp âm thanh)
       const { sound } = await Audio.Sound.createAsync(
-        require("../assets/sounds/alarm.mp3"), // Đảm bảo có tệp âm thanh này
+        { uri: "https://www.soundjay.com/phone/sounds/cell-phone-1-nr6.mp3" },
         {
           shouldPlay: true,
           isLooping: true,
@@ -91,14 +91,14 @@ const AlarmModal = ({
     }
   };
 
-  // Dừng âm thanh báo thức
-  const stopSound = async () => {
+  // Dừng âm thanh báo thức - sử dụng useCallback để tránh tạo mới mỗi lần render
+  const stopSound = useCallback(async () => {
     if (sound) {
       await sound.stopAsync();
       await sound.unloadAsync();
       setSound(null);
     }
-  };
+  }, [sound]);
 
   // Start vibration when modal becomes visible
   useEffect(() => {
