@@ -14,6 +14,7 @@ import {
   getDailyWorkStatus,
   getNotes,
   createDataBackup,
+  updateDailyWorkStatus,
 } from "../utils/database"
 import {
   configureNotifications,
@@ -72,8 +73,8 @@ export const AppProvider = ({ children }) => {
         await initializeAlarmSystem()
 
         // Setup notification listeners
-        const { removeNotificationListeners } = setupNotificationListeners()
-        const cleanupListeners = removeNotificationListeners
+        const setupResult = setupNotificationListeners()
+        const cleanupListeners = setupResult?.removeNotificationListeners
 
         // Check if reset is needed
         const resetNeeded = await checkIfResetNeeded()
@@ -185,6 +186,36 @@ export const AppProvider = ({ children }) => {
   // Update an existing shift
   const handleUpdateShift = async (updatedShift) => {}
 
+  // Reset today's logs
+  const handleResetTodayLogs = async () => {
+    try {
+      const success = await resetTodayAttendanceLogs()
+      if (success) {
+        setTodayLogs([])
+
+        // Reset work status
+        const today = new Date().toISOString().split("T")[0]
+        const resetStatus = {
+          status: "Chưa cập nhật",
+          totalWorkTime: 0,
+          overtime: 0,
+          remarks: "",
+        }
+        await updateDailyWorkStatus(today, resetStatus)
+        setWorkStatus(resetStatus)
+
+        // Refresh weekly status
+        setWeeklyStatusRefreshTrigger((prev) => prev + 1)
+
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("Error resetting today's logs:", error)
+      return false
+    }
+  }
+
   // Context value
   const contextValue = {
     darkMode,
@@ -222,6 +253,7 @@ export const AppProvider = ({ children }) => {
     setAlarmData,
     weeklyStatusRefreshTrigger,
     refreshWeeklyStatus: () => setWeeklyStatusRefreshTrigger((prev) => prev + 1),
+    resetTodayLogs: handleResetTodayLogs,
   }
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
