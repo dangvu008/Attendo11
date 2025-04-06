@@ -1,17 +1,25 @@
+import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as BackgroundFetch from "expo-background-fetch";
+import * as TaskManager from "expo-task-manager";
+import {
+  Platform,
+  Vibration,
+  Alert,
+  View,
+  Text,
+  TouchableOpacity,
+} from "react-native";
+import * as KeepAwake from "expo-keep-awake";
+import { STORAGE_KEYS } from "./database";
+import React, { useEffect } from "react";
+
 /**
  * Alarm Utilities Module
  *
  * This module provides functions for creating and managing alarms in the Attendo app.
  * It uses Expo Notifications for notification features and Vibration for feedback.
  */
-
-import * as Notifications from "expo-notifications";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as BackgroundFetch from "expo-background-fetch";
-import * as TaskManager from "expo-task-manager";
-import { Platform, Vibration, Alert } from "react-native";
-import * as KeepAwake from "expo-keep-awake";
-import { STORAGE_KEYS } from "./database";
 
 // Define task names
 const BACKGROUND_ALARM_TASK = "BACKGROUND_ALARM_TASK";
@@ -740,13 +748,13 @@ export const checkScheduledNotifications = async () => {
   }
 };
 
-// Thêm vào app startup để kiểm tra
-useEffect(() => {
-  // Thêm vào AppContext.js trong loadData
+// Replace the top-level useEffect at the bottom of the file with a function
+export const initializeNotificationsCheck = () => {
+  // Function to check notifications (moved from useEffect)
   const checkNotifications = async () => {
     const notifications = await checkScheduledNotifications();
     console.log(`Tổng số thông báo đã lên lịch: ${notifications.length}`);
   };
 
   checkNotifications();
-}, []);
+};
