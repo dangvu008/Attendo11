@@ -807,7 +807,7 @@ export const initializeNotificationsCheck = () => {
 };
 
 // Lưu lịch sử chạy background task
-export const logTaskExecution = async (taskName, result) => {
+export const logTaskExecutionInternal = async (taskName, result) => {
   try {
     // Lấy lịch sử hiện tại
     const taskHistoryJson =
