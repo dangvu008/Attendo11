@@ -12,6 +12,7 @@ import * as TaskManager from "expo-task-manager";
 import { Platform, Vibration } from "react-native";
 import * as KeepAwake from "expo-keep-awake";
 import { STORAGE_KEYS } from "./database";
+import * as Audio from "expo-av";
 
 // Define task names
 const BACKGROUND_ALARM_TASK = "BACKGROUND_ALARM_TASK";

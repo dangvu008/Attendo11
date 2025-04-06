@@ -49,7 +49,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as KeepAwake from "expo-keep-awake";
-import * as Audio from "expo-audio-session";
+import { Audio } from "expo-av";
 
 /**
  * AlarmModal Component
@@ -125,7 +125,7 @@ const AlarmModal = ({
         deactivateScreen();
       };
     }
-  }, [visible]);
+  }, [visible, stopSound]);
 
   // Start vibration pattern with a stronger pattern
   const startVibration = () => {
